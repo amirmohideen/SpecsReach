@@ -5,8 +5,8 @@ import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {InteractorEvent} from "SpectaclesInteractionKit.lspkg/Core/Interactor/InteractorEvent"
 import {InteractorInputType} from "SpectaclesInteractionKit.lspkg/Core/Interactor/Interactor"
-import {ArmAxes} from "./ArmAxes"
-import {ClutchControl, ClutchMode, ClutchOut, resolveSwitch} from "./ClutchControl"
+import {WristAxesGizmo} from "./WristAxesGizmo"
+import {ClutchStateMachine, ClutchMode, ClutchOut, resolveSwitch} from "./ClutchStateMachine"
 
 /**
  * Streams Spectacles hand tracking to the SpecsReach relay, which drives the
@@ -23,11 +23,11 @@ import {ClutchControl, ClutchMode, ClutchOut, resolveSwitch} from "./ClutchContr
  * arm's tool then follows the drive hand's wrist (default right). Release the
  * pinch to let go, re-pinch from a comfortable spot to reach further.
  * Alternatively, toggle mode: a DRIVE button (pressed with the clutch hand)
- * starts and stops the grab instead of a held pinch (ClutchControl.ts).
+ * starts and stops the grab instead of a held pinch (ClutchStateMachine.ts).
  *
- * The arm's X/Y/Z axes are drawn at the drive wrist (ArmAxes.ts), using the
- * relay's view-mode mapping: dim and following the head before a grab, bright
- * and frozen while grabbing.
+ * The arm's X/Y/Z axes are drawn at the drive wrist (WristAxesGizmo.ts), using
+ * the relay's view-mode mapping: dim and following the head before a grab,
+ * bright and frozen while grabbing.
  *
  * Wire format (one JSON text frame per tick, positions in cm, Lens world):
  *   {"type":"hand","t":<ms>,
@@ -49,7 +49,7 @@ function v3(p: vec3): number[] {
   return [Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, Math.round(p.z * 100) / 100]
 }
 
-/** What the digital twin (ArmTwin) gives ArmTeleop to send in twin mode. */
+/** What the digital twin (ArmDigitalTwin) gives ArmRelayClient to send in twin mode. */
 export interface TwinSource {
   /** active = a moving part of the model is held; pose = TCP target (mm, RPY deg, arm base). */
   twinMessage(): {active: boolean, pose: number[]}
@@ -59,7 +59,7 @@ export interface TwinSource {
  * menu   : nothing drives; the last message type keeps flowing with its clutch
  *          off, so a grab that was on lets go at once.
  * teleop : hand tracking drives the arm (pinch / toggle clutch).
- * twin   : the digital twin (ArmTwin) drives it through `twin` messages.
+ * twin   : the digital twin (ArmDigitalTwin) drives it through `twin` messages.
  */
 export type AppMode = "menu" | "teleop" | "twin"
 
@@ -74,7 +74,7 @@ const WARN_LABELS: {[code: number]: string} = {
 }
 
 @component
-export class ArmTeleop extends BaseScriptComponent {
+export class ArmRelayClient extends BaseScriptComponent {
   @input
   @hint("Relay address(es), e.g. ws://192.168.1.50:8766. Comma-separate several and the Lens cycles through them on each retry. The relay prints the URL when it starts.")
   serverUrl: string = "ws://RELAY-PC-IP:8766"
@@ -156,10 +156,10 @@ export class ArmTeleop extends BaseScriptComponent {
   private relayAt: number = 0
 
   // --- clutch (pinch / toggle) and the wrist axes ---
-  private clutchCtl: ClutchControl = new ClutchControl("pinch")
+  private clutchCtl: ClutchStateMachine = new ClutchStateMachine("pinch")
   private clutchOut: ClutchOut = {tracked: false, pinch: false}
   private driveHooked: boolean = false
-  private axes: ArmAxes | null = null
+  private axes: WristAxesGizmo | null = null
   private axesNote: string = ""
   private liveFwd: vec3 = new vec3(0, 0, -1)    // horizontal look direction, world
   private frozenFwd: vec3 | null = null
@@ -167,7 +167,7 @@ export class ArmTeleop extends BaseScriptComponent {
   private hudNoteAt: number = 0
   private driveLabel: string = ""
 
-  // --- app mode (ArmMenu) and the digital twin ---
+  // --- app mode (ModeSelectMenu) and the digital twin ---
   private appMode: AppMode = "teleop"   // without a menu, the original behaviour
   private lastSent: "hand" | "twin" = "hand"
   private twin: TwinSource | null = null
@@ -184,7 +184,7 @@ export class ArmTeleop extends BaseScriptComponent {
   }
 
   private onStart() {
-    this.clutchCtl = new ClutchControl(this.clutchMode === "toggle" ? "toggle" : "pinch")
+    this.clutchCtl = new ClutchStateMachine(this.clutchMode === "toggle" ? "toggle" : "pinch")
     if (this.internetModule === undefined || this.internetModule === null) {
       this.state = "NO INTERNET MODULE"
       this.lastError = "require('LensStudio:InternetModule') returned nothing"
@@ -218,7 +218,7 @@ export class ArmTeleop extends BaseScriptComponent {
     }
 
     this.createAxes()
-    print(`[ArmTeleop] drive=${this.driveHand} clutch=${this.clutchCtl.mode} -> ${this.urls.join(" | ")}`)
+    print(`[ArmRelayClient] drive=${this.driveHand} clutch=${this.clutchCtl.mode} -> ${this.urls.join(" | ")}`)
     this.renderHud(true)
     this.connect()
   }
@@ -230,7 +230,7 @@ export class ArmTeleop extends BaseScriptComponent {
     }
     try {
       const font = this.statusText !== undefined && this.statusText !== null ? this.statusText.font : null
-      this.axes = new ArmAxes(this.getSceneObject(), this.axesMaterial, {
+      this.axes = new WristAxesGizmo(this.getSceneObject(), this.axesMaterial, {
         lengthCm: 6,
         thicknessCm: 0.4,
         labels: this.axisLabels,
@@ -240,7 +240,7 @@ export class ArmTeleop extends BaseScriptComponent {
     } catch (e) {
       this.axes = null
       this.axesNote = `axes failed: ${e}`
-      print(`[ArmTeleop] ${this.axesNote}`)
+      print(`[ArmRelayClient] ${this.axesNote}`)
     }
   }
 
@@ -274,7 +274,7 @@ export class ArmTeleop extends BaseScriptComponent {
     this.state = "CONNECTING"
     const url = this.currentUrl()
     this.renderHud(true)
-    print(`[ArmTeleop] connect attempt ${this.attempts} -> ${url}`)
+    print(`[ArmRelayClient] connect attempt ${this.attempts} -> ${url}`)
 
     try {
       const sock = this.internetModule.createWebSocket(url)
@@ -291,7 +291,7 @@ export class ArmTeleop extends BaseScriptComponent {
         this.send({type: "hello", boot: this.boot, drive: this.driveHand, clutch: this.clutchName(),
                    device: this.deviceKind()})
         this.renderHud(true)
-        print("[ArmTeleop] connected")
+        print("[ArmRelayClient] connected")
       }
       sock.onmessage = (event: WebSocketMessageEvent) => {
         if (typeof event.data !== "string") {
@@ -319,7 +319,7 @@ export class ArmTeleop extends BaseScriptComponent {
         this.state = "CLOSED"
         this.scheduleRetry()
         this.renderHud(true)
-        print(`[ArmTeleop] closed, code ${event.code}`)
+        print(`[ArmRelayClient] closed, code ${event.code}`)
       }
       sock.onerror = () => {
         this.connected = false
@@ -330,7 +330,7 @@ export class ArmTeleop extends BaseScriptComponent {
         this.lastError = "onerror -- no route to the relay, or ws:// refused"
         this.scheduleRetry()
         this.renderHud(true)
-        print("[ArmTeleop] socket error")
+        print("[ArmRelayClient] socket error")
       }
     } catch (e) {
       this.connecting = false
@@ -338,7 +338,7 @@ export class ArmTeleop extends BaseScriptComponent {
       this.lastError = `createWebSocket threw: ${e}`
       this.scheduleRetry()
       this.renderHud(true)
-      print(`[ArmTeleop] createWebSocket threw: ${e}`)
+      print(`[ArmRelayClient] createWebSocket threw: ${e}`)
     }
   }
 
@@ -413,7 +413,7 @@ export class ArmTeleop extends BaseScriptComponent {
     this.renderHud(false)
   }
 
-  /** This frame's clutch (ClutchControl), the head direction, and the axes freeze. */
+  /** This frame's clutch (ClutchStateMachine), the head direction, and the axes freeze. */
   private updateClutch(now: number) {
     if (this.camera !== null) {
       // Transform.forward points out of the back of the camera.
@@ -435,7 +435,7 @@ export class ArmTeleop extends BaseScriptComponent {
   }
 
   /** ON / OFF in driveStateText. Checked every frame because DRIVE can switch
-   * itself off (ClutchControl.frame); the Text is only written on a change. */
+   * itself off (ClutchStateMachine.frame); the Text is only written on a change. */
   private updateDriveLabel() {
     if (this.driveStateText === undefined || this.driveStateText === null) {
       return
@@ -484,7 +484,7 @@ export class ArmTeleop extends BaseScriptComponent {
     const toggle = resolveSwitch(value, this.clutchCtl.mode === "toggle")
     const mode: ClutchMode = toggle ? "toggle" : "pinch"
     if (this.clutchCtl.setMode(mode)) {
-      print(`[ArmTeleop] clutch mode ${mode}`)
+      print(`[ArmRelayClient] clutch mode ${mode}`)
       this.renderHud(true)
     }
   }
@@ -502,7 +502,7 @@ export class ArmTeleop extends BaseScriptComponent {
   private requestDrive(on: boolean) {
     const driveTracked = this.drive !== null && this.drive.isTracked()
     this.clutchCtl.requestDrive(on, getTime(), this.connected, driveTracked)
-    print(`[ArmTeleop] DRIVE ${this.clutchCtl.toggleOn ? "ON" : "OFF"}` +
+    print(`[ArmRelayClient] DRIVE ${this.clutchCtl.toggleOn ? "ON" : "OFF"}` +
           (this.clutchCtl.note ? ` (${this.clutchCtl.note})` : ""))
     this.renderHud(true)
   }
@@ -527,14 +527,14 @@ export class ArmTeleop extends BaseScriptComponent {
     if ((by & driveBit) !== 0) {
       // The drive hand is the one that moves the arm: never let it press DRIVE.
       this.clutchCtl.note = `DRIVE ignored: press it with your ${this.clutchName()} hand`
-      print(`[ArmTeleop] ${this.clutchCtl.note}`)
+      print(`[ArmRelayClient] ${this.clutchCtl.note}`)
       this.renderHud(true)
       return
     }
     this.requestDrive(!this.clutchCtl.toggleOn)
   }
 
-  // ---- app mode and the digital twin (ArmMenu / ArmTwin) ---------------
+  // ---- app mode and the digital twin (ModeSelectMenu / ArmDigitalTwin) ---------------
   /** Switch between the menu, hand teleop and the digital twin. Any DRIVE toggle switches off. */
   public setAppMode(mode: AppMode) {
     if (mode === this.appMode) {
@@ -545,7 +545,7 @@ export class ArmTeleop extends BaseScriptComponent {
     }
     this.appMode = mode
     this.clutchCtl.connectionChanged("app mode changed")
-    print(`[ArmTeleop] app mode ${mode}`)
+    print(`[ArmRelayClient] app mode ${mode}`)
     this.renderHud(true)
   }
 
@@ -553,7 +553,7 @@ export class ArmTeleop extends BaseScriptComponent {
     return this.appMode
   }
 
-  /** ArmTwin attaches itself when shown (null when hidden). */
+  /** ArmDigitalTwin attaches itself when shown (null when hidden). */
   public attachTwin(source: TwinSource | null) {
     this.twin = source
   }
@@ -608,7 +608,7 @@ export class ArmTeleop extends BaseScriptComponent {
       t: Math.round(now * 1000),
       drive: drive,
       // Pinch mode: the clutch hand's tracking and pinch, as always. Toggle
-      // mode: tracked = true, pinch = DRIVE (ClutchControl).
+      // mode: tracked = true, pinch = DRIVE (ClutchStateMachine).
       clutch: {tracked: this.clutchOut.tracked, pinch: this.clutchOut.pinch, mode: this.clutchCtl.mode}
     }
     if (this.camera !== null) {
@@ -618,7 +618,7 @@ export class ArmTeleop extends BaseScriptComponent {
 
     if (this.debugLog && now - this.lastLogAt > 1.0) {
       this.lastLogAt = now
-      print(`[ArmTeleop] drive=${driveTracked} clutch=${this.clutchCtl.mode} ` +
+      print(`[ArmRelayClient] drive=${driveTracked} clutch=${this.clutchCtl.mode} ` +
             `tracked=${msg.clutch.tracked} pinch=${msg.clutch.pinch}` +
             (driveTracked ? ` wrist=${drive.wrist.join(",")}` : ""))
     }

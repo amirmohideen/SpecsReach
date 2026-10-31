@@ -53,8 +53,8 @@
     -
       {}
   InputLines:
-    - '// @input AssignableType teleop {"hint":"The ArmTeleop component."}'
-    - '// @input AssignableType_1 twin {"hint":"The ArmTwin component (the digital twin model)."}'
+    - '// @input AssignableType teleop {"hint":"The ArmRelayClient component."}'
+    - '// @input AssignableType_1 twin {"hint":"The ArmDigitalTwin component (the digital twin model)."}'
     - '// @input SceneObject menuPanel {"hint":"The menu panel with the Teleop / Digital Twin buttons; shown only in the menu."}'
     - '// @input SceneObject[] teleopObjects = {} {"hint":"Objects shown only in Teleop mode (e.g. the DRIVE / clutch panel)."}'
     - '// @input SceneObject[] twinObjects = {} {"hint":"Objects shown only in Digital Twin mode (e.g. a Back / Recenter panel)."}'

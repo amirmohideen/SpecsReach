@@ -33,11 +33,11 @@ why the relay sits in between.
 
 | Part | What it does |
 |---|---|
-| `Assets/Scripts/ArmTeleop.ts` | The connection to the relay. Sends the drive hand's wrist and knuckles, the clutch, the head direction (or the twin's target in twin mode), and shows a status HUD. |
-| `Assets/Scripts/ClutchControl.ts` | The clutch: hold-a-pinch (default) or a DRIVE toggle button. |
-| `Assets/Scripts/ArmAxes.ts` | Draws the arm's X/Y/Z axes at your right wrist in teleop. |
-| `Assets/Scripts/ArmMenu.ts` | The main menu and switching between modes. |
-| `Assets/Scripts/ArmTwin.ts` | The digital twin: builds the model, handles pinch and drag, highlights parts on hover. |
+| `Assets/Scripts/ArmRelayClient.ts` | The connection to the relay. Sends the drive hand's wrist and knuckles, the clutch, the head direction (or the twin's target in twin mode), and shows a status HUD. |
+| `Assets/Scripts/ClutchStateMachine.ts` | The clutch: hold-a-pinch (default) or a DRIVE toggle button. |
+| `Assets/Scripts/WristAxesGizmo.ts` | Draws the arm's X/Y/Z axes at your right wrist in teleop. |
+| `Assets/Scripts/ModeSelectMenu.ts` | The main menu and switching between modes. |
+| `Assets/Scripts/ArmDigitalTwin.ts` | The digital twin: builds the model, handles pinch and drag, highlights parts on hover. |
 | `Assets/Scripts/AuboKinematics.ts` | AUBO i5H forward and inverse kinematics, taken from the URDF. |
 | `Assets/Scripts/HandBridge.ts` | From SpecsGrip: finger angles to the DG-5F bridge. |
 | `specs_relay/` | The relay. Turns hand or twin data into arm targets and speaks the arm bridge's protocol. See [its README](specs_relay/README.md). |
@@ -67,7 +67,8 @@ before cloning.
    ([SpecsGrip setup](https://github.com/amirmohideen/SpecsGrip#-setup--guide))
    and note its URL.
 3. **Lens Studio:** open this project, then:
-   1. Select **ArmTeleop** and put the relay URL in **Server Url**.
+   1. Select the **ArmTeleop** object and, on its `ArmRelayClient` script,
+      put the relay URL in **Server Url**.
    2. Select **RoboHandBridge** and put the hand bridge URL in its
       **Server Url**.
 4. **Push to the Spectacles.** Lens Studio Preview can't open network
@@ -84,7 +85,7 @@ before cloning.
 | Hand | Does |
 |---|---|
 | Left pinch, held | Grabs the arm. Open the pinch to let go: the arm stops smoothly where it is. |
-| DRIVE button (toggle mode) | Starts and stops the grab instead of a held pinch. Press it with your left hand. Turn toggle mode on with the clutch switch or ArmTeleop's **Clutch Mode**. |
+| DRIVE button (toggle mode) | Starts and stops the grab instead of a held pinch. Press it with your left hand. Turn toggle mode on with the clutch switch or ArmRelayClient's **Clutch Mode**. |
 | Right wrist | While grabbed, the tool moves (and, if enabled, turns) as your wrist does. |
 | Right fingers | Drive the DG-5F. |
 
@@ -106,9 +107,9 @@ capped speed (60 mm/s and 20°/s by default), so it trails behind a quick drag.
 - **Relay tuning** lives in `specs_relay/specs_relay.json`: speeds, filtering,
   whether the tool follows wrist rotation, the twin's speed limits, and more.
   Edit it and restart the relay; the Lens doesn't need a rebuild.
-- **ArmTeleop** has the clutch mode, which hand drives, the view direction
+- **ArmRelayClient** has the clutch mode, which hand drives, the view direction
   (`View Yaw Deg`), and an optional text that shows DRIVE ON/OFF.
-- **ArmTwin** has the model's scale and spawn spot, and its materials: Arm
+- **ArmDigitalTwin** has the model's scale and spawn spot, and its materials: Arm
   Material, per-part **Link Materials**, a Ghost Material for the drag
   preview, and hover and grab outline colors.
 

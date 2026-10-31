@@ -5,7 +5,7 @@ import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {InteractorEvent} from "SpectaclesInteractionKit.lspkg/Core/Interactor/InteractorEvent"
 import {InteractorInputType} from "SpectaclesInteractionKit.lspkg/Core/Interactor/Interactor"
-import {ArmTeleop, TwinSource} from "./ArmTeleop"
+import {ArmRelayClient, TwinSource} from "./ArmRelayClient"
 import * as K from "./AuboKinematics"
 
 /**
@@ -22,7 +22,7 @@ import * as K from "./AuboKinematics"
  *
  * The model always shows the REAL arm (its pose comes back from the relay at
  * 10 Hz); a see-through ghost shows where you are dragging it, when a Ghost
- * Material is set. The target goes to the relay through ArmTeleop's
+ * Material is set. The target goes to the relay through ArmRelayClient's
  * connection (the relay takes one Lens connection), as a `twin` message; the
  * relay moves the arm by the target's motion since the grab, with its usual
  * limits, and the bridge's safety on top.
@@ -86,10 +86,10 @@ interface Drag {
 }
 
 @component
-export class ArmTwin extends BaseScriptComponent implements TwinSource {
+export class ArmDigitalTwin extends BaseScriptComponent implements TwinSource {
   @input
-  @hint("The ArmTeleop component: the twin sends through its relay connection.")
-  teleop: ArmTeleop
+  @hint("The ArmRelayClient component: the twin sends through its relay connection.")
+  teleop: ArmRelayClient
 
   @input
   @hint("The 7 imported link meshes in order: link0 (base) ... link6 (flange), from ModelImport/link0.glb ... link6.glb.")
@@ -187,7 +187,7 @@ export class ArmTwin extends BaseScriptComponent implements TwinSource {
     this.createEvent("UpdateEvent").bind(() => this.onUpdate())
   }
 
-  // ---- TwinSource (ArmTeleop pulls this every send tick) ----------------
+  // ---- TwinSource (ArmRelayClient pulls this every send tick) ----------------
   /** Active while a moving part (not the base) is held; pose = the model's TCP target. */
   public twinMessage(): {active: boolean, pose: number[]} {
     const active = this.visible && this.drag !== null && this.drag.link !== BASE_LINK
@@ -196,7 +196,7 @@ export class ArmTwin extends BaseScriptComponent implements TwinSource {
     return {active: active, pose: p.pos.concat(p.rpy).map((v) => Math.round(v * 100) / 100)}
   }
 
-  // ---- show / hide (ArmMenu) --------------------------------------------
+  // ---- show / hide (ModeSelectMenu) --------------------------------------------
   /** Show the model in front of you, mirroring the arm, and take over the relay link. */
   public show() {
     if (!this.built) {
@@ -237,12 +237,12 @@ export class ArmTwin extends BaseScriptComponent implements TwinSource {
     this.built = true
     if (!this.linkMeshes || this.linkMeshes.length < 7 || this.linkMeshes.some((m) => !m)) {
       this.buildNote = "set all 7 Link Meshes (link0..link6)"
-      print(`[ArmTwin] ${this.buildNote}`)
+      print(`[ArmDigitalTwin] ${this.buildNote}`)
       return
     }
     if (!this.armMaterial) {
       this.buildNote = "set the Arm Material"
-      print(`[ArmTwin] ${this.buildNote}`)
+      print(`[ArmDigitalTwin] ${this.buildNote}`)
       return
     }
     this.detectImport()
@@ -263,11 +263,11 @@ export class ArmTwin extends BaseScriptComponent implements TwinSource {
       }
     }
     this.root.enabled = false
-    print(`[ArmTwin] built: mesh scale ${this.meshScale.toFixed(3)} ${this.buildNote}`)
+    print(`[ArmDigitalTwin] built: mesh scale ${this.meshScale.toFixed(3)} ${this.buildNote}`)
   }
 
   private makeLink(i: number, material: Material, grabbable: boolean): SceneObject {
-    const obj = global.scene.createSceneObject(`ArmTwin${grabbable ? "" : "Ghost"}_link${i}`)
+    const obj = global.scene.createSceneObject(`ArmDigitalTwin${grabbable ? "" : "Ghost"}_link${i}`)
     obj.setParent(this.root)
     obj.layer = this.root.layer
     const visual = obj.createComponent("Component.RenderMeshVisual") as RenderMeshVisual
@@ -456,7 +456,7 @@ export class ArmTwin extends BaseScriptComponent implements TwinSource {
     this.openSince = -1
     this.qCmd = this.qShown.slice()
     this.dragNote = link === BASE_LINK ? "moving the model" : `moving the arm by its ${LINK_NAMES[link]}`
-    print(`[ArmTwin] grab ${LINK_NAMES[link]}`)
+    print(`[ArmDigitalTwin] grab ${LINK_NAMES[link]}`)
   }
 
   private onRelease(link: number) {

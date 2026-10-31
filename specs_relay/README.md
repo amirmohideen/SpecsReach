@@ -1,6 +1,6 @@
 # specs_relay — Spectacles hand tracking → arm bridge
 
-The station half of **SpecsReach**. The Spectacles Lens (`Assets/Scripts/ArmTeleop.ts`
+The station half of **SpecsReach**. The Spectacles Lens (`Assets/Scripts/ArmRelayClient.ts`
 in the SpecsReach Lens project) can open a WebSocket but not a WebRTC
 PeerConnection. This relay sits between the Lens and the bridge and appears to the
 bridge as an ordinary headset:
@@ -68,7 +68,7 @@ docker run --rm -it --network host -v "$PWD":/workspace -w /workspace quest-came
 ```
 
 1. The relay prints `Lens URL: ws://<ip>:8766`. Put it in **Server Url** of the
-   `ArmTeleop` component.
+   `ArmRelayClient` component.
 2. Open the Lens on the glasses. The relay then connects to the bridge (only
    while a Lens is connected, plus 10 s), and the HUD shows `bridge: connected`.
 3. Type `e` + Enter to enable the arm. On the AUBO this is power-on plus brake
@@ -103,7 +103,7 @@ connect, and the reverse is also true.
 ## Digital twin mode
 
 The Lens can drive the arm from a 3D model of it instead of the hand: the
-operator pinches a part of the model and drags it (`ArmTwin.ts` in the
+operator pinches a part of the model and drags it (`ArmDigitalTwin.ts` in the
 SpecsReach Lens). The Lens then sends, instead of `hand` messages:
 
 ```json

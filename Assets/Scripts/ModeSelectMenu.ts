@@ -1,24 +1,24 @@
-import {ArmTeleop} from "./ArmTeleop"
-import {ArmTwin} from "./ArmTwin"
+import {ArmRelayClient} from "./ArmRelayClient"
+import {ArmDigitalTwin} from "./ArmDigitalTwin"
 
 /**
  * The main menu: choose Teleop (hand tracking drives the arm) or Digital Twin
  * (drag a 3D model of the arm). Wire UIKit buttons' "On Trigger Up
  * Callbacks" to startTeleop / startTwin / showMenu (and recenterTwin).
  *
- * Switching mode always tells ArmTeleop first, which lets go of any grab
- * before the new mode can drive (ArmTeleop.setAppMode).
+ * Switching mode always tells ArmRelayClient first, which lets go of any grab
+ * before the new mode can drive (ArmRelayClient.setAppMode).
  */
 @component
-export class ArmMenu extends BaseScriptComponent {
+export class ModeSelectMenu extends BaseScriptComponent {
   @input
-  @hint("The ArmTeleop component.")
-  teleop: ArmTeleop
+  @hint("The ArmRelayClient component.")
+  teleop: ArmRelayClient
 
   @input
   @allowUndefined
-  @hint("The ArmTwin component (the digital twin model).")
-  twin: ArmTwin
+  @hint("The ArmDigitalTwin component (the digital twin model).")
+  twin: ArmDigitalTwin
 
   @input
   @allowUndefined

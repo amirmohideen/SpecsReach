@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stand-in for the SpecsReach digital twin (ArmTwin.ts): drives the relay's
+"""Stand-in for the SpecsReach digital twin (ArmDigitalTwin.ts): drives the relay's
 `twin` path without glasses.
 
 Waits for the arm's actual pose in the relay state, then plays a model drawn

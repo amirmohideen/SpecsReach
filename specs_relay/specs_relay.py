@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SpecsReach relay -- Snap Spectacles hand tracking -> the arm bridge.
 
-The Spectacles Lens (SpecsReach `ArmTeleop.ts`) can open a WebSocket but not a
+The Spectacles Lens (SpecsReach `ArmRelayClient.ts`) can open a WebSocket but not a
 WebRTC PeerConnection, so this relay stands between the two:
 
     Lens --ws:// JSON @ ~50 Hz--> specs_relay --WebRTC `arm` + `armctl`--> arm bridge :8444

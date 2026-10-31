@@ -71,7 +71,7 @@
     -
       {}
   InputLines:
-    - '// @input AssignableType teleop {"hint":"The ArmTeleop component: the twin sends through its relay connection."}'
+    - '// @input AssignableType teleop {"hint":"The ArmRelayClient component: the twin sends through its relay connection."}'
     - '// @input Asset.RenderMesh[] linkMeshes {"hint":"The 7 imported link meshes in order: link0 (base) ... link6 (flange), from ModelImport/link0.glb ... link6.glb."}'
     - '// @input Asset.Material armMaterial {"hint":"Material for the model (e.g. a grey PBR or Unlit material)."}'
     - '// @input Asset.Material[] linkMaterials = {} {"hint":"Optional per-part materials, same order as Link Meshes (element 0 = link0, the base ... 6 = the flange). An empty slot, or a shorter list, uses Arm Material for that part."}'

@@ -1,5 +1,5 @@
 /**
- * The clutch for ArmTeleop: what goes into the `clutch` field of each hand
+ * The clutch for ArmRelayClient: what goes into the `clutch` field of each hand
  * message, plus when the wrist axes freeze. Plain TypeScript with no Lens
  * Studio APIs (the caller passes the time and the hand state), so the rules
  * can be tested outside the editor.
@@ -47,7 +47,7 @@ export function resolveSwitch(value: unknown, current: boolean): boolean {
   return !current
 }
 
-export class ClutchControl {
+export class ClutchStateMachine {
   mode: ClutchMode
   toggleOn: boolean = false
   /** Why the toggle last switched itself off, or why DRIVE was refused; "" = nothing to say. */

@@ -1,8 +1,8 @@
 /**
  * Draws the arm's X/Y/Z axes as three short bars at a point (the drive wrist):
  * X red, Y green, Z blue, with optional X/Y/Z labels at the tips that turn to
- * face the camera. ArmTeleop decides the directions and calls update() every
- * frame; this class only builds and places the visuals.
+ * face the camera. ArmRelayClient decides the directions and calls update()
+ * every frame; this class only builds and places the visuals.
  *
  * Everything is created in code, so the scene only needs one Unlit material:
  * it is cloned once per axis and recoloured. "Dim" is darker colours rather
@@ -17,7 +17,7 @@ const AXIS_COLORS = [
 ]
 const DIM = 0.35
 
-export interface ArmAxesOptions {
+export interface WristAxesGizmoOptions {
   lengthCm: number
   thicknessCm: number
   labels: boolean
@@ -59,7 +59,7 @@ function barMesh(length: number, half: number): RenderMesh {
   return b.getMesh()
 }
 
-export class ArmAxes {
+export class WristAxesGizmo {
   private root: SceneObject
   private bars: SceneObject[] = []
   private materials: Material[] = []
@@ -69,9 +69,9 @@ export class ArmAxes {
   private bright: boolean | null = null
   private visible: boolean = true
 
-  constructor(parent: SceneObject, material: Material, opts: ArmAxesOptions) {
+  constructor(parent: SceneObject, material: Material, opts: WristAxesGizmoOptions) {
     this.length = opts.lengthCm
-    this.root = global.scene.createSceneObject("ArmAxes")
+    this.root = global.scene.createSceneObject("WristAxesGizmo")
     this.root.setParent(parent)
     this.root.layer = parent.layer
     const mesh = barMesh(opts.lengthCm, opts.thicknessCm / 2)
