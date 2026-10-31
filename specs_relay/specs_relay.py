@@ -54,7 +54,7 @@ from gi.repository import GLib, Gst, GstSdp, GstWebRTC  # noqa: E402
 import websockets  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from teleop_map import LensSample, Teleop, Tuning  # noqa: E402  (also puts arm_bridge on sys.path)
+from teleop_map import LensSample, Teleop, Tuning, TwinSample  # noqa: E402  (also puts arm_bridge on sys.path)
 from arm_bridge import protocol  # noqa: E402
 
 LINGER_S = 10.0          # keep the bridge link this long after the Lens leaves
@@ -484,6 +484,12 @@ class Relay:
             self.lens_link.hand(time.monotonic(), msg.get("t"))
             with self.lock:
                 self.teleop.on_lens(sample, time.monotonic())
+        elif kind == "twin":
+            # Digital twin mode: the model's TCP target, already in the arm frame.
+            sample = TwinSample.from_json(msg)
+            self.lens_link.hand(time.monotonic(), msg.get("t"))
+            with self.lock:
+                self.teleop.on_twin(sample, time.monotonic())
         elif kind == "hello":
             boot = msg.get("boot")
             if boot != self.lens_boot and self.teleop.room_forward is not None:
@@ -529,6 +535,10 @@ class Relay:
                 "calibrating": self.cal_start is not None,
                 "note": self.teleop.note,
                 "reply": self.last_reply,
+                # The arm's actual TCP (mm, RPY deg; null without a fresh STATUS),
+                # so the Lens's digital twin can mirror the real arm.
+                "pose": ([round(v, 2) for v in (st.x, st.y, st.z, st.roll, st.pitch, st.yaw)]
+                         if fresh else None),
             }
 
     # ---- keyboard --------------------------------------------------------

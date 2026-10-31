@@ -9,7 +9,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from teleop_map import (LensSample, Teleop, Tuning, basis, hand_rotation,  # noqa: E402
+from teleop_map import (LensSample, Teleop, Tuning, TwinSample, basis, hand_rotation,  # noqa: E402
                         yaw_from_points)
 from arm_bridge import rotation  # noqa: E402
 from arm_bridge.protocol import ArmState, Status  # noqa: E402
@@ -334,6 +334,126 @@ class ParseTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             Tuning.from_dict({"positon_scale": 2})
         self.assertEqual(Tuning.from_dict({"_note": "x", "view_yaw_deg": 90}).view_yaw_deg, 90.0)
+
+
+def twin(active, pose=(400.0, 0.0, 300.0, 180.0, 0.0, 0.0)):
+    return TwinSample.from_json({"type": "twin", "active": active, "pose": list(pose)})
+
+
+class TwinTest(unittest.TestCase):
+    """Digital twin: absolute model TCP targets, relative arm motion, same clutch rules."""
+
+    def step(self, rig, sample=None, st=None):
+        rig.t += DT
+        rig.tele.on_status(st or rig.tele.status, rig.t)
+        if sample is not None:
+            rig.tele.on_twin(sample, rig.t)
+        return rig.tele.tick(rig.t)
+
+    def grab(self, rig, pose=(400.0, 0.0, 300.0, 180.0, 0.0, 0.0)):
+        self.step(rig, twin(False, pose))
+        return self.step(rig, twin(True, pose))
+
+    def test_press_edge_engages_and_idle_echoes_actual(self):
+        rig = Rig()
+        self.assertFalse(self.step(rig, twin(False)).deadman)
+        self.assertTrue(self.grab(rig).deadman)
+        self.assertIn("twin", rig.tele.note)
+
+    def test_active_from_the_start_does_not_engage(self):
+        rig = Rig()
+        for _ in range(5):
+            self.assertFalse(self.step(rig, twin(True)).deadman)
+
+    def test_arm_follows_the_models_motion_relative_to_the_grab(self):
+        rig = Rig()                                     # actual arm at (400, 0, 300)
+        # The model's TCP is drawn 5 mm off the actual pose: no jump at the grab.
+        cmd = self.grab(rig, (405.0, 0.0, 300.0, 180.0, 0.0, 0.0))
+        self.assertAlmostEqual(cmd.pose[0], 400.0, delta=1e-6)
+        for _ in range(100):
+            cmd = self.step(rig, twin(True, (435.0, -20.0, 310.0, 180.0, 0.0, 0.0)))
+        self.assertAlmostEqual(cmd.pose[0], 430.0, delta=0.01)
+        self.assertAlmostEqual(cmd.pose[1], -20.0, delta=0.01)
+        self.assertAlmostEqual(cmd.pose[2], 310.0, delta=0.01)
+
+    def test_orientation_follows_even_with_hand_orientation_off(self):
+        rig = Rig(enable_orientation=False)
+        self.grab(rig)
+        for _ in range(100):
+            cmd = self.step(rig, twin(True, (400.0, 0.0, 300.0, 180.0, 0.0, 20.0)))
+        w = rotation.rotvec_between((180.0, 0.0, 0.0), cmd.pose[3:])
+        self.assertAlmostEqual(w[2], 20.0, delta=0.05)
+        for v in cmd.pose[3:]:
+            self.assertTrue(-180.0 <= v <= 180.0)      # principal RPY for the bridge box
+
+    def test_twin_orientation_off_holds_the_tool_rotation(self):
+        rig = Rig(twin_orientation=False)
+        self.grab(rig)
+        for _ in range(50):
+            cmd = self.step(rig, twin(True, (420.0, 0.0, 300.0, 180.0, 0.0, 20.0)))
+        self.assertAlmostEqual(rotation.angle_between((180.0, 0.0, 0.0), cmd.pose[3:]), 0.0, delta=1e-6)
+        self.assertAlmostEqual(cmd.pose[0], 420.0, delta=0.01)
+
+    def test_speed_limit_and_range_box(self):
+        rig = Rig()
+        self.grab(rig)
+        cmd = self.step(rig, twin(True, (1400.0, 0.0, 300.0, 180.0, 0.0, 0.0)))
+        self.assertLessEqual(cmd.pose[0] - 400.0, 60.0 * DT + 1e-6)      # twin_max_speed_mm_s
+        for _ in range(500):                                             # 10 s at 60 mm/s
+            cmd = self.step(rig, twin(True, (1400.0, 0.0, 300.0, 180.0, 0.0, 0.0)))
+        self.assertAlmostEqual(cmd.pose[0], 900.0, delta=0.01)          # anchor + max_range_mm
+
+    def test_twin_speeds_are_separate_from_the_hand_and_tunable(self):
+        rig = Rig(twin_max_speed_mm_s=20.0, twin_max_orient_speed_deg_s=5.0)
+        self.grab(rig)
+        cmd = None
+        for _ in range(50):                                              # 1 s
+            cmd = self.step(rig, twin(True, (500.0, 0.0, 300.0, 180.0, 0.0, 30.0)))
+        self.assertAlmostEqual(cmd.pose[0], 420.0, delta=0.01)          # 20 mm/s x 1 s
+        turned = rotation.angle_between((180.0, 0.0, 0.0), cmd.pose[3:])
+        self.assertAlmostEqual(turned, 5.0, delta=0.05)                 # 5 deg/s x 1 s
+
+    def test_release_on_let_go_silence_and_fault(self):
+        rig = Rig()
+        self.grab(rig)
+        self.assertFalse(self.step(rig, twin(False)).deadman)       # immediate, no grace
+        self.assertIn("let go", rig.tele.note)
+        rig = Rig()
+        self.grab(rig)
+        rig.t += 0.5                                                 # > lens_timeout_s (0.3)
+        self.assertFalse(self.step(rig).deadman)
+        self.assertIn("silent", rig.tele.note)
+        rig = Rig()
+        self.grab(rig)
+        self.assertFalse(self.step(rig, twin(True), st=status(err=31)).deadman)
+
+    def test_refused_without_servo_then_needs_a_new_edge(self):
+        rig = Rig()
+        ready = status(state=ArmState.READY)
+        self.step(rig, twin(False), st=ready)
+        self.assertFalse(self.step(rig, twin(True), st=ready).deadman)
+        self.assertIn("READY", rig.tele.note)
+        self.assertFalse(self.step(rig, twin(True), st=status()).deadman)  # still held
+        self.step(rig, twin(False))
+        self.assertTrue(self.step(rig, twin(True)).deadman)
+
+    def test_twin_takes_over_from_a_hand_grab(self):
+        rig = Rig()
+        self.assertTrue(rig.engage().deadman)                        # hand grab
+        cmd = self.step(rig, twin(False))
+        self.assertFalse(cmd.deadman)
+        self.assertIn("twin took over", rig.tele.note)
+        # twin quiet again: the hand needs a fresh pinch edge, a held pinch does nothing
+        rig.t += 0.5
+        self.assertFalse(rig.step(hand(pinch=True)).deadman)
+        rig.step(hand())
+        self.assertTrue(rig.step(hand(pinch=True)).deadman)
+
+    def test_parse_rejects_bad_poses(self):
+        with self.assertRaises(ValueError):
+            TwinSample.from_json({"type": "twin", "active": True, "pose": [1, 2, 3]})
+        with self.assertRaises(ValueError):
+            TwinSample.from_json({"type": "twin", "active": True, "pose": [1, 2, 3, 4, float("nan"), 6]})
 
 
 if __name__ == "__main__":

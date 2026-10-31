@@ -1,11 +1,14 @@
 CollapsedEntities:
   type: stringset
   value:
-    size: 774
+    size: 835
     values:
       - ArmAxesUnlit.mat
       - Scripts/ArmAxes.ts
+      - Scripts/ArmMenu.ts
       - Scripts/ArmTeleop.ts
+      - Scripts/ArmTwin.ts
+      - Scripts/AuboKinematics.ts
       - Scripts/ClutchControl.ts
       - SpectaclesInteractionKit.lspkg/Assets
       - SpectaclesInteractionKit.lspkg/Assets/Audio
@@ -756,8 +759,66 @@ CollapsedEntities:
       - SpectaclesUIKit.lspkg/package_dependencies.json
       - armaxesunlit.ss_graph
       - aubo_i5H_10
+      - aubo_i5H_10 2/ArmTwinGhostUnlit.mat
+      - aubo_i5H_10 2/ArmTwinUnlit.mat
+      - aubo_i5H_10 2/ArmTwinlink0Unlit.mat
+      - aubo_i5H_10 2/link0.glb
+      - aubo_i5H_10 2/link0.glb/Meshes/geometry_0
+      - aubo_i5H_10 2/link0.glb/link0
+      - aubo_i5H_10 2/link1.glb
+      - aubo_i5H_10 2/link1.glb/Meshes
+      - aubo_i5H_10 2/link1.glb/Meshes/geometry_0
+      - aubo_i5H_10 2/link1.glb/link1
+      - aubo_i5H_10 2/link2.glb
+      - aubo_i5H_10 2/link2.glb/Meshes
+      - aubo_i5H_10 2/link2.glb/Meshes/geometry_0
+      - aubo_i5H_10 2/link2.glb/link2
+      - aubo_i5H_10 2/link3.glb
+      - aubo_i5H_10 2/link3.glb/Meshes
+      - aubo_i5H_10 2/link3.glb/Meshes/geometry_0
+      - aubo_i5H_10 2/link3.glb/link3
+      - aubo_i5H_10 2/link4.glb
+      - aubo_i5H_10 2/link4.glb/Meshes
+      - aubo_i5H_10 2/link4.glb/Meshes/geometry_0
+      - aubo_i5H_10 2/link4.glb/link4
+      - aubo_i5H_10 2/link5.glb
+      - aubo_i5H_10 2/link5.glb/Meshes
+      - aubo_i5H_10 2/link5.glb/Meshes/geometry_0
+      - aubo_i5H_10 2/link5.glb/link5
+      - aubo_i5H_10 2/link6.glb
+      - aubo_i5H_10 2/link6.glb/Meshes
+      - aubo_i5H_10 2/link6.glb/Meshes/geometry_0
+      - aubo_i5H_10 2/link6.glb/link6
       - aubo_i5H_10/MANIFEST.json
       - aubo_i5H_10/aubo_i5H_10.urdf
+      - aubo_i5H_10/link0.glb
+      - aubo_i5H_10/link0.glb/Meshes
+      - aubo_i5H_10/link0.glb/Meshes/geometry_0
+      - aubo_i5H_10/link0.glb/link0
+      - aubo_i5H_10/link1.glb
+      - aubo_i5H_10/link1.glb/Meshes
+      - aubo_i5H_10/link1.glb/Meshes/geometry_0
+      - aubo_i5H_10/link1.glb/link1
+      - aubo_i5H_10/link2.glb
+      - aubo_i5H_10/link2.glb/Meshes
+      - aubo_i5H_10/link2.glb/Meshes/geometry_0
+      - aubo_i5H_10/link2.glb/link2
+      - aubo_i5H_10/link3.glb
+      - aubo_i5H_10/link3.glb/Meshes
+      - aubo_i5H_10/link3.glb/Meshes/geometry_0
+      - aubo_i5H_10/link3.glb/link3
+      - aubo_i5H_10/link4.glb
+      - aubo_i5H_10/link4.glb/Meshes
+      - aubo_i5H_10/link4.glb/Meshes/geometry_0
+      - aubo_i5H_10/link4.glb/link4
+      - aubo_i5H_10/link5.glb
+      - aubo_i5H_10/link5.glb/Meshes
+      - aubo_i5H_10/link5.glb/Meshes/geometry_0
+      - aubo_i5H_10/link5.glb/link5
+      - aubo_i5H_10/link6.glb
+      - aubo_i5H_10/link6.glb/Meshes
+      - aubo_i5H_10/link6.glb/Meshes/geometry_0
+      - aubo_i5H_10/link6.glb/link6
       - aubo_i5H_10/meshes
       - aubo_i5H_10/meshes/aubo_i5H
       - aubo_i5H_10/meshes/aubo_i5H/collision

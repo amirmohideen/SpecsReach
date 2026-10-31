@@ -1,0 +1,61 @@
+- !<AssetImportMetadata/d00b024d-a9a8-4573-b98a-7897da327d23>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 4fb6ab92-4764-4f91-bbc6-0def039ce9ab
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 4fb6ab92-4764-4f91-bbc6-0def039ce9ab
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 07364cfd-22f2-45bd-a7f7-26d26ed4ba4f
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/07364cfd-22f2-45bd-a7f7-26d26ed4ba4f>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 23e1d8f3-5d3e-4186-8ca8-70a19fd15a84
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    menuPanel: false
+    startIn: false
+    teleop: false
+    teleopObjects: false
+    twin: false
+    twinObjects: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - teleop: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      twin: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      menuPanel: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      teleopObjects: !<reference.SceneObject[]>
+        []
+      twinObjects: !<reference.SceneObject[]>
+        []
+      startIn: menu
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input AssignableType teleop {"hint":"The ArmTeleop component."}'
+    - '// @input AssignableType_1 twin {"hint":"The ArmTwin component (the digital twin model)."}'
+    - '// @input SceneObject menuPanel {"hint":"The menu panel with the Teleop / Digital Twin buttons; shown only in the menu."}'
+    - '// @input SceneObject[] teleopObjects = {} {"hint":"Objects shown only in Teleop mode (e.g. the DRIVE / clutch panel)."}'
+    - '// @input SceneObject[] twinObjects = {} {"hint":"Objects shown only in Digital Twin mode (e.g. a Back / Recenter panel)."}'
+    - '// @input string startIn = "menu" {"hint":"What the Lens opens in.", "widget":"combobox", "values":[{"label":"menu", "value":"menu"}, {"label":"teleop", "value":"teleop"}, {"label":"twin", "value":"twin"}]}'

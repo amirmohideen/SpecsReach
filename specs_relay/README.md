@@ -100,6 +100,37 @@ connect, and the reverse is also true.
 - As with SpecsGrip, the Lens can't connect from Lens Studio Preview. Test on
   the glasses.
 
+## Digital twin mode
+
+The Lens can drive the arm from a 3D model of it instead of the hand: the
+operator pinches a part of the model and drags it (`ArmTwin.ts` in the
+SpecsReach Lens). The Lens then sends, instead of `hand` messages:
+
+```json
+{"type": "twin", "t": 12345, "active": true, "pose": [x, y, z, roll, pitch, yaw]}
+```
+
+`pose` is the model's TCP in the arm base frame (mm, RPY degrees, the bridge's
+convention); `active` is the twin's clutch (true while a part is held).
+
+- Same clutch rules as the hand: a grab starts on an `active` false -> true
+  edge and only when the arm is ready; it ends at once when `active` turns
+  false, when twin messages stop for `lens_timeout_s`, or on a fault.
+- The arm follows the target's motion **since the grab** (relative), so a model
+  drawn a little off the real arm cannot make it jump. The usual speed, range
+  and rotation limits apply, and the bridge's own safety on top.
+- `twin_orientation` (default true) follows the tool rotation too; the hand's
+  `enable_orientation` does not apply, because the twin's targets are noise-free.
+- `twin_max_speed_mm_s` / `twin_max_orient_speed_deg_s` (default 60 / 20) set
+  how fast the arm chases the model, separate from the hand's limits: a small
+  model turns small hand moves into big arm moves. The model shows the real
+  arm catching up; letting go stops it wherever it has got to.
+- While twin messages flow the twin owns the arm: a hand grab is released and
+  needs a fresh pinch afterwards.
+
+The relay's `state` message carries `pose`: the arm's actual TCP (or null
+without a fresh STATUS), which the Lens uses to pose the model like the real arm.
+
 ## Test without glasses
 
 ```bash

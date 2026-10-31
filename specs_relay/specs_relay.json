@@ -18,5 +18,10 @@
   "lens_timeout_s": 1.0,
   "clutch_release_s": 0.15,
   "status_fresh_s": 0.15,
-  "calibration_min_cm": 20.0
+  "calibration_min_cm": 20.0,
+  "_twin_orientation": "digital twin mode: follow the model tool's rotation as well as its position (its targets are noise-free). false = position only.",
+  "twin_orientation": true,
+  "_twin_max_speed_mm_s": "digital twin: how fast the real arm chases the model (mm/s, deg/s). A 40% model turns small hand moves into big arm moves; raise slowly if it feels sluggish.",
+  "twin_max_speed_mm_s": 60.0,
+  "twin_max_orient_speed_deg_s": 20.0
 }

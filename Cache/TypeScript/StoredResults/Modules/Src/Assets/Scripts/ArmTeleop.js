@@ -158,6 +158,12 @@ let ArmTeleop = (() => {
             this.hudNote = "";
             this.hudNoteAt = 0;
             this.driveLabel = "";
+            // --- app mode (ArmMenu) and the digital twin ---
+            this.appMode = "teleop"; // without a menu, the original behaviour
+            this.lastSent = "hand";
+            this.twin = null;
+            this.lastTwinPose = null;
+            this.twinReleaseUntil = 0; // after leaving twin mode: keep saying "not active"
         }
         __initialize() {
             super.__initialize();
@@ -207,6 +213,12 @@ let ArmTeleop = (() => {
             this.hudNote = "";
             this.hudNoteAt = 0;
             this.driveLabel = "";
+            // --- app mode (ArmMenu) and the digital twin ---
+            this.appMode = "teleop"; // without a menu, the original behaviour
+            this.lastSent = "hand";
+            this.twin = null;
+            this.lastTwinPose = null;
+            this.twinReleaseUntil = 0; // after leaving twin mode: keep saying "not active"
         }
         onAwake() {
             // A new id per Lens launch: the world origin restarts with the Lens, so
@@ -431,7 +443,8 @@ let ArmTeleop = (() => {
                 return;
             }
             this.lastSendAt = now;
-            if (this.send(this.sample(now))) {
+            const msg = this.message(now);
+            if (msg !== null && this.send(msg)) {
                 this.packetsSent += 1;
             }
             this.renderHud(false);
@@ -476,7 +489,7 @@ let ArmTeleop = (() => {
             }
             const d = this.drive;
             const roomMode = this.relay !== null && this.relay.mode === "room";
-            if (d === null || !d.isTracked() || roomMode) {
+            if (d === null || !d.isTracked() || roomMode || this.appMode !== "teleop") {
                 this.axes.setVisible(false);
                 return;
             }
@@ -550,6 +563,59 @@ let ArmTeleop = (() => {
             }
             this.requestDrive(!this.clutchCtl.toggleOn);
         }
+        // ---- app mode and the digital twin (ArmMenu / ArmTwin) ---------------
+        /** Switch between the menu, hand teleop and the digital twin. Any DRIVE toggle switches off. */
+        setAppMode(mode) {
+            if (mode === this.appMode) {
+                return;
+            }
+            if (this.appMode === "twin") {
+                this.twinReleaseUntil = getTime() + 0.3;
+            }
+            this.appMode = mode;
+            this.clutchCtl.connectionChanged("app mode changed");
+            print(`[ArmTeleop] app mode ${mode}`);
+            this.renderHud(true);
+        }
+        getAppMode() {
+            return this.appMode;
+        }
+        /** ArmTwin attaches itself when shown (null when hidden). */
+        attachTwin(source) {
+            this.twin = source;
+        }
+        /** The relay's latest state message (with the arm's actual `pose`), or null if none for 1 s. */
+        getRelayState() {
+            return this.connected && this.relay !== null && getTime() - this.relayAt < 1.0 ? this.relay : null;
+        }
+        /**
+         * The message for this tick. teleop: hand. twin: the twin's target. Leaving
+         * twin mode, and in the menu after it: "twin, not active" (last pose), so
+         * the relay lets go now instead of after its silence timeout. Menu after
+         * teleop: hand with the clutch off, for the same reason.
+         */
+        message(now) {
+            if (this.appMode === "twin") {
+                if (this.twin === null) {
+                    return null;
+                }
+                const m = this.twin.twinMessage();
+                this.lastTwinPose = m.pose;
+                this.lastSent = "twin";
+                return { type: "twin", t: Math.round(now * 1000), active: m.active, pose: m.pose };
+            }
+            if (this.lastSent === "twin" && (this.appMode === "menu" || now < this.twinReleaseUntil)) {
+                const pose = this.twin !== null ? this.twin.twinMessage().pose : this.lastTwinPose;
+                return pose === null ? null : { type: "twin", t: Math.round(now * 1000), active: false, pose: pose };
+            }
+            if (this.appMode === "menu") {
+                const msg = this.sample(now);
+                msg.clutch = { tracked: true, pinch: false, mode: this.clutchCtl.mode };
+                return msg;
+            }
+            this.lastSent = "hand";
+            return this.sample(now);
+        }
         sample(now) {
             const d = this.drive;
             const driveTracked = d !== null && d.isTracked();
@@ -617,7 +683,11 @@ let ArmTeleop = (() => {
                 }
                 else if (r.bridge === "connected" && r.arm === "SERVO" && !r.err && !r.hold) {
                     color = COLOR_OK;
-                    if (!driveTracked)
+                    if (this.appMode === "twin")
+                        note = r.note || "drag the model to move the arm";
+                    else if (this.appMode === "menu")
+                        note = "choose a mode";
+                    else if (!driveTracked)
                         note = `show your ${this.driveHand} hand`;
                     else
                         note = this.clutchHint(pinching, `${r.note || ""}`);
@@ -644,7 +714,7 @@ let ArmTeleop = (() => {
             const roomMode = this.relay !== null && this.relay.mode === "room";
             const axesLine = roomMode ? "room mode: axes unknown" : this.axesNote;
             this.statusText.text =
-                `SPECSREACH ARM ${r !== null && r.engaged ? "  ** DRIVING **" : ""}\n` +
+                `SPECSREACH ARM  [${this.appMode.toUpperCase()}]${r !== null && r.engaged ? "  ** DRIVING **" : ""}\n` +
                     `relay : ${this.state}  ${this.currentUrl()}\n` +
                     `bridge: ${r !== null ? r.bridge : "-"}   arm: ${arm}\n` +
                     `mode  : ${r !== null ? r.mode + (r.calibrating ? " (calibrating)" : "") : "-"}   sent: ${this.packetsSent}\n` +

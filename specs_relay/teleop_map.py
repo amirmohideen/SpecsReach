@@ -235,6 +235,11 @@ class Tuning:
                                        # hand tracking drops a held pinch for a frame or two
     status_fresh_s: float = 0.15       # STATUS older than this = refuse to drive
     calibration_min_cm: float = 20.0
+    twin_orientation: bool = True      # digital twin: follow the model's tool rotation too
+                                       # (its targets are noise-free, unlike a tracked hand)
+    twin_max_speed_mm_s: float = 60.0      # digital twin: how fast the arm chases the model.
+    twin_max_orient_speed_deg_s: float = 20.0  # A small model turns small hand moves into big
+                                               # arm moves; the arm catches up at this pace.
 
     @staticmethod
     def from_dict(d: dict) -> "Tuning":
@@ -249,6 +254,39 @@ class Tuning:
         if t.mode not in ("view", "room"):
             raise ValueError("mode must be 'view' or 'room'")
         return t
+
+
+@dataclass(frozen=True)
+class TwinSample:
+    """One Lens `twin` message: the digital twin's TCP target, already in the
+    arm base frame (mm, RPY degrees as the bridge uses them). `active` is the
+    twin's clutch -- true while the operator holds a part of the model."""
+    active: bool
+    pos: Vec3
+    rot: Matrix
+
+    @staticmethod
+    def from_json(msg: dict) -> "TwinSample":
+        """Parse a Lens `twin` message; raises ValueError on a malformed one."""
+        pose = msg.get("pose")
+        if not isinstance(pose, (list, tuple)) or len(pose) != 6:
+            raise ValueError(f"bad twin pose {pose!r}")
+        v = tuple(float(c) for c in pose)
+        if not all(math.isfinite(c) for c in v):
+            raise ValueError("non-finite twin pose")
+        return TwinSample(active=bool(msg.get("active")), pos=v[:3],
+                          rot=rotation.rpy_to_matrix(*v[3:]))
+
+
+@dataclass
+class _TwinEngagement:
+    twin_pos: Vec3          # twin target at engage, mm
+    twin_rot: Matrix
+    arm_pos: Vec3           # actual arm at engage, mm
+    arm_rot: Matrix
+    last_pos: Vec3
+    last_rot: Matrix
+    last_rpy: Vec3
 
 
 @dataclass(frozen=True)
@@ -287,6 +325,10 @@ class Teleop:
     _prev_clutch: bool | None = None
     _open_since: float | None = None       # engaged, but the pinch has been open since
     _eng: _Engagement | None = None
+    _twin: TwinSample | None = None
+    _twin_t: float = -1e9
+    _twin_prev: bool | None = None
+    _twin_eng: _TwinEngagement | None = None
     _last_tick: float | None = None
     note: str = "waiting for the Lens"
 
@@ -294,15 +336,19 @@ class Teleop:
     def on_lens(self, sample: LensSample, now: float) -> None:
         self._sample, self._sample_t = sample, now
 
+    def on_twin(self, sample: TwinSample, now: float) -> None:
+        self._twin, self._twin_t = sample, now
+
     def on_status(self, status: Status, now: float) -> None:
         self._status, self._status_t = status, now
 
     def forget_lens(self) -> None:
         self._sample = None
+        self._twin = None
 
     @property
     def engaged(self) -> bool:
-        return self._eng is not None
+        return self._eng is not None or self._twin_eng is not None
 
     @property
     def status(self) -> Status | None:
@@ -335,6 +381,16 @@ class Teleop:
         if self.note in ("no STATUS from the bridge yet", "waiting for the Lens"):
             self.note = "ready"
         t = self.tuning
+        # The digital twin owns the arm while its messages flow (or it holds a
+        # grab); the hand path then lets go and needs a fresh pinch afterwards.
+        if self._twin_eng is not None or (self._twin is not None
+                                          and now - self._twin_t <= t.lens_timeout_s):
+            if self._eng is not None:
+                self._eng = None
+                self.note = "released: digital twin took over"
+            self._prev_clutch = None
+            self._open_since = None
+            return self._tick_twin(now, dt, st)
         s = self._sample
         lens_ok = s is not None and now - self._sample_t <= t.lens_timeout_s
         clutch = lens_ok and s.clutch_tracked and s.pinch
@@ -382,6 +438,58 @@ class Teleop:
         if pose is None:     # degenerate frame this tick: hold the last target
             pose = self._eng.last_pos + self._eng.last_rpy
         return Command(True, pose, st.gripper, st.motion_permit_id)
+
+    def _tick_twin(self, now: float, dt: float, st: Status) -> Command:
+        """Digital twin: the same clutch rules as the hand (press edge, gates,
+        release), but the target is the model's TCP, already in the arm frame.
+        The arm follows the target's motion since the grab (relative, like the
+        hand), so a model drawn slightly off the actual pose cannot jump it."""
+        t = self.tuning
+        tw = self._twin
+        live = tw is not None and now - self._twin_t <= t.lens_timeout_s
+        active = live and tw.active
+        press = active and self._twin_prev is False
+        self._twin_prev = tw.active if live else None
+        gate = self._gate(st, now)
+
+        if self._twin_eng is not None:
+            why = ("twin silent" if not live else
+                   "twin let go" if not tw.active else gate)
+            if why:
+                self._twin_eng = None
+                self.note = f"released: {why}"
+        elif press:
+            if gate:
+                self.note = f"engage refused: {gate}"
+            else:
+                arm_pos = (st.x, st.y, st.z)
+                arm_rot = rotation.rpy_to_matrix(st.roll, st.pitch, st.yaw)
+                self._twin_eng = _TwinEngagement(
+                    twin_pos=tw.pos, twin_rot=tw.rot, arm_pos=arm_pos, arm_rot=arm_rot,
+                    last_pos=arm_pos, last_rot=arm_rot, last_rpy=(st.roll, st.pitch, st.yaw))
+                self.note = "engaged (twin)"
+
+        if self._twin_eng is None:
+            return Command(False, (st.x, st.y, st.z, st.roll, st.pitch, st.yaw),
+                           st.gripper, st.motion_permit_id)
+        e = self._twin_eng
+        d = _sub(tw.pos, e.twin_pos)
+        lim = t.max_range_mm
+        d = tuple(min(max(c, -lim), lim) for c in d)
+        step = _clamp_norm(_sub(_add(e.arm_pos, d), e.last_pos), t.twin_max_speed_mm_s * dt)
+        pos = _add(e.last_pos, step)
+        if t.twin_orientation:
+            w = _clamp_norm(rotation.matrix_log(_mul(tw.rot, _transpose(e.twin_rot))),
+                            t.max_orient_deg)
+            target_rot = _mul(rotation.matrix_exp(w), e.arm_rot)
+            dw = _clamp_norm(rotation.matrix_log(_mul(target_rot, _transpose(e.last_rot))),
+                             t.twin_max_orient_speed_deg_s * dt)
+            rot_cmd = _mul(rotation.matrix_exp(dw), e.last_rot)
+        else:
+            rot_cmd = e.arm_rot
+        rpy = rotation.matrix_to_rpy(rot_cmd)    # principal: the bridge's RPY box
+        e.last_pos, e.last_rot, e.last_rpy = pos, rot_cmd, rpy
+        return Command(True, pos + rpy, st.gripper, st.motion_permit_id)
 
     def _gate(self, st: Status, now: float) -> str:
         if now - self._status_t > self.tuning.status_fresh_s:

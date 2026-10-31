@@ -44,6 +44,8 @@ dock:
       - items:
           - persistentName: Snap.Plugin.Gui.PreviewPanel
             Uuid: 52fc2a95-41a3-427b-a138-1e00eb1c405e
+          - persistentName: Snap.Plugin.Gui.Graph.Editor
+            Uuid: 569630e6-d2a9-4662-8744-f16aeb231bbe
         type: section
         current: 0
     sizes:
