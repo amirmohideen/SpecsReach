@@ -1,0 +1,60 @@
+# Arm bridge configuration for SpecsReach: an AUBO i5H on an ARCS controller.
+# Every key and its default: arm_bridge/arm_bridge/config.py. The safety
+# limits live here and in the bridge, never in the Lens or the relay.
+# Restart the bridge after an edit: station/start_bridge.sh
+
+# Which arm driver runs. aubo = the real arm. mock = no hardware: the "arm"
+# jumps to every target, for testing the whole path safely.
+arm_backend: aubo
+
+# The arm model (arm_bridge/arm_bridge/dashboard/static/assets/<id>/). The
+# driver checks that the connected robot reports this model and refuses to
+# drive it otherwise.
+robot_model: aubo_i5H_10
+
+aubo:
+  host: "192.168.1.10"            # controller address (pendant: Settings -> System -> Network)
+  # Tool centre point (mm and degrees: x, y, z, roll, pitch, yaw) and payload.
+  # The bridge writes both to the controller when it connects, so this file
+  # is their one source. These values are for a BARE FLANGE.
+  # - Keep yaw 90: it turns the tool axes to the convention the relay and the
+  #   digital twin use (tool-down reads RPY 180, 0, 0). ArmDigitalTwin's TCP
+  #   yaw input must match it.
+  # - With the DG-5F mounted, set z to the hand's centre (mm out from the
+  #   flange) and the payload to its mass and centre of gravity.
+  tcp_offset: [0, 0, 0, 0, 0, 90]
+  payload_kg: 0.0
+  payload_cog: [0, 0, 0]          # mm
+  # Joint limits the bridge enforces. The controller allows +/-360 on every
+  # joint, which is not a safe limit. J3 (elbow) within +/-150 keeps the
+  # forearm from folding back onto the upper arm. A joint outside these holds
+  # teleop (warn 1002); RETREAT (relay key t) brings it back inside.
+  joint_min_deg: [-355, -160, -150, -355, -355, -355]
+  joint_max_deg: [355, 160, 150, 355, 355, 355]
+  # Defaults, shown for reference:
+  # max_joint_speed_deg_s: 90     # no joint faster than this while driving
+  # max_joint_acc_deg_s2: 400     # ... nor accelerating faster
+  # elbow_min_deg: 15             # |J3| never closes below this (a straight elbow is singular)
+  # home_speed_deg_s: 20          # HOME speed, times the pendant's speed slider
+  # user: aubo                    # ARCS factory login
+  # password: "123456"
+
+# The bridge's control loop. 50 Hz matches the relay; the AUBO accepts at
+# most about 100 points a second.
+servo_hz: 50
+# No heartbeat from the relay for this long = the bridge holds the arm.
+watchdog_ms: 1000
+
+# Where the tool may go, in the arm's base frame (mm). A target outside is
+# refused (the arm holds at its last good target), never clamped.
+workspace:
+  z_min: 120.0                    # the tool stays 120 mm above the base plane
+  reach_center_z: 122.0           # the shoulder (J2 axis) height
+  reach_max_mm: 1000.0            # the flange reaches about 980 mm from it
+  # Keep-out zones the tool point may not enter. This one blocks the tucked
+  # posture behind and around the base column.
+  keepouts: [{shape: cylinder, name: base column, cx: 0, cy: 0, radius: 250, z_min: 0, z_max: 350}]
+
+# After a fault or protective stop the bridge writes the last 10 s of servo
+# ticks (targets, commands, actual pose) here, as JSONL.
+journal_dir: /workspace/logs/journal

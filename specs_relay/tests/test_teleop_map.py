@@ -1,6 +1,6 @@
 """Tests for the Spectacles -> arm mapping (stdlib unittest, no hardware).
 
-    python3 -m unittest discover -s tools/specs_relay/tests   (or pytest, as in run_py_tests.sh)
+    python3 -m unittest discover -s specs_relay/tests
 """
 
 import math

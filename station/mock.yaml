@@ -1,0 +1,16 @@
+# Arm bridge with NO hardware, for testing the whole Lens -> relay -> bridge
+# path. The mock "arm" jumps to every accepted target; the bridge's workspace
+# and speed checks still run, so they match station/arm_bridge.yaml.
+#
+#   CONFIG=station/mock.yaml SIGNALING_PORT=8454 station/start_bridge.sh
+#   NAME=specsreach-relay-test station/start_relay.sh --bridge-port 8454 --port 8776 --auto-enable
+arm_backend: mock
+robot_model: aubo_i5H_10
+servo_hz: 50
+watchdog_ms: 1000
+workspace:
+  z_min: 120.0
+  reach_center_z: 122.0
+  reach_max_mm: 1000.0
+  keepouts: [{shape: cylinder, name: base column, cx: 0, cy: 0, radius: 250, z_min: 0, z_max: 350}]
+journal_dir: /workspace/logs/journal

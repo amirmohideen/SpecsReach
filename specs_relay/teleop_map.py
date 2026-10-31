@@ -48,8 +48,12 @@ import os
 import sys
 from dataclasses import dataclass, field
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                "..", "..", "arm_bridge"))
+# The arm bridge's `arm_bridge` package: SpecsReach/arm_bridge/ next to this
+# folder, or teleop-server/arm_bridge/ when the relay sits in its tools/.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+for _root in (os.path.join(_HERE, "..", "..", "arm_bridge"), os.path.join(_HERE, "..", "arm_bridge")):
+    if os.path.isdir(os.path.join(_root, "arm_bridge")):
+        sys.path.insert(0, _root)
 from arm_bridge import rotation  # noqa: E402
 from arm_bridge.protocol import ArmState, Status  # noqa: E402
 

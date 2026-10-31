@@ -7,7 +7,7 @@ Waits for the arm's actual pose in the relay state, then plays a model drawn
 model's TCP +30 mm X, turn it 15 deg about Z, let go. Prints what the relay
 reports back.
 
-    python3 tools/specs_relay/fake_twin.py ws://127.0.0.1:8766
+    python3 specs_relay/fake_twin.py ws://127.0.0.1:8766
 
 On the real arm keep a hand on the e-stop: this moves it 30 mm.
 """

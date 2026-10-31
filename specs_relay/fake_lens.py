@@ -5,7 +5,7 @@ Sends the Lens wire format at 50 Hz: a flat right hand at rest, then a left
 pinch (clutch), a slow cosine move of the right wrist `--cm` along one
 operator axis and back, then a release. Prints the relay's state replies.
 
-    python3 tools/specs_relay/fake_lens.py --url ws://127.0.0.1:8766 --axis forward --cm 3
+    python3 specs_relay/fake_lens.py --url ws://127.0.0.1:8766 --axis forward --cm 3
 
 Axes are the operator's (view mode, looking along the Lens world -Z):
 forward / right / up. With the mock bridge (`arm_backend: mock`) and

@@ -25,10 +25,10 @@ Safety on this hop:
 - Power-on (ENABLE) is an operator action: keyboard `e`, never automatic
   unless `--auto-enable` is given.
 
-    python3 tools/specs_relay/specs_relay.py --bridge-host 127.0.0.1 --port 8766
+    python3 specs_relay/specs_relay.py --bridge-host 127.0.0.1 --port 8766
 
 Requires GStreamer webrtcbin + websockets: run inside the station image
-(see tools/specs_relay/README.md).
+(see specs_relay/README.md).
 """
 
 from __future__ import annotations

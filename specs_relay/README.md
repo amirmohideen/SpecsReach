@@ -59,16 +59,20 @@ the two keep kicking each other off, so close the Preview while driving.
 
 ## Run (on the station)
 
-Start the bridge as usual (`scripts/start_all.sh`, or the bridge container alone),
-then:
+Start the arm bridge (`station/start_bridge.sh`, or an arm bridge that already
+runs on the station), then, from the repo root:
 
 ```bash
-docker run --rm -it --network host -v "$PWD":/workspace -w /workspace quest-camera-server:dev \
-  python3 tools/specs_relay/specs_relay.py --bridge-host 127.0.0.1 --port 8766
+station/start_relay.sh
 ```
 
-1. The relay prints `Lens URL: ws://<ip>:8766`. Put it in **Server Url** of the
-   `ArmRelayClient` component.
+That runs `specs_relay.py --bridge-host 127.0.0.1 --port 8766` in the
+`specsreach-station` image; extra arguments are passed through.
+
+1. Put the station's **Wi-Fi** address in **Server Url** of the
+   `ArmRelayClient` component: `ws://<wifi-ip>:8766`. `python3
+   station/netcheck.py` prints it. The relay also prints a `Lens URL` line per
+   address, including the arm's cable network, which the glasses can't reach.
 2. Open the Lens on the glasses. The relay then connects to the bridge (only
    while a Lens is connected, plus 10 s), and the HUD shows `bridge: connected`.
 3. Type `e` + Enter to enable the arm. On the AUBO this is power-on plus brake
@@ -97,8 +101,9 @@ connect, and the reverse is also true.
 - The station's wired port (to the AUBO) never takes the default route, so use
   the station's **Wi-Fi** address.
 - Open TCP 8766 if a firewall is on.
-- As with SpecsGrip, the Lens can't connect from Lens Studio Preview. Test on
-  the glasses.
+- Test on the glasses. Lens Studio's Preview can connect too (when its device
+  type is Spectacles), and then takes over from the glasses: close it while
+  driving.
 
 ## Digital twin mode
 
@@ -133,18 +138,30 @@ without a fresh STATUS), which the Lens uses to pose the model like the real arm
 
 ## Test without glasses
 
+From the repo root, in the station image:
+
 ```bash
-python3 -m unittest discover -s tools/specs_relay/tests       # mapping + clutch logic, stdlib only
-python3 tools/specs_relay/fake_lens.py --url ws://127.0.0.1:8766 --axis forward --cm 3
+docker run --rm -v "$PWD":/workspace -w /workspace specsreach-station \
+  python3 -m unittest discover -s specs_relay/tests     # mapping + clutch logic
 ```
 
-`fake_lens.py` plays a 50 Hz Lens: a rest, a left pinch, the right wrist moved
-`--cm` out and back, then a release.
-- **Mock arm:** with `arm_backend: mock` and `--auto-enable`, it exercises the
-  whole station path.
-- **Real arm:** keep `--cm` small and a hand on the e-stop.
+The whole station path with a mock arm (`station/mock.yaml`), on spare ports
+so it never meets the real bridge or relay:
 
-`scripts/run_py_tests.sh` runs these tests along with the other suites.
+```bash
+CONFIG=station/mock.yaml SIGNALING_PORT=8454 station/start_bridge.sh
+NAME=specsreach-relay-test station/start_relay.sh --bridge-port 8454 --port 8776 --auto-enable
+# in a second terminal:
+docker run --rm --network host -v "$PWD":/workspace -w /workspace specsreach-station \
+  python3 specs_relay/fake_lens.py --url ws://127.0.0.1:8776 --axis forward --cm 3
+docker rm -f specsreach-arm-mock                        # when done
+```
+
+- `fake_lens.py` plays a 50 Hz Lens: a rest, a left pinch, the right wrist
+  moved `--cm` out and back, then a release. `fake_twin.py <url>` does the same
+  for the digital twin.
+- `--auto-enable` powers the arm on by itself: use it with the mock only.
+- **Real arm:** keep `--cm` small and a hand on the e-stop.
 
 ## Tuning (`specs_relay.json`)
 
@@ -173,14 +190,13 @@ python3 tools/specs_relay/fake_lens.py --url ws://127.0.0.1:8766 --axis forward 
   0.2 s more lag.
 - `enable_orientation` false: position only for the first sessions.
 
-## Not verified yet
+## Verified, and not yet
 
-- **(HW)** Every Spectacles session so far, and the WebRTC link from this relay
-  to a running bridge. The relay uses the same webrtcbin offer sequence as
-  `tools/arm_test_peer`, which has run against the bridge.
-- **(HW)** The Lens world axes. They are assumed right-handed with +Y up, in cm,
-  which is the Lens Studio convention. If "forward" drives the arm sideways, fix
-  `view_yaw_deg`. If up/down or a rotation comes out mirrored, the handedness
-  assumption is wrong. Report it, and don't tune around it.
+- **Verified on the station (2026-10-30/31):** Spectacles teleop of the AUBO
+  through this relay and the arm bridge, with the movement directions right in
+  view mode (`view_yaw_deg` 0), so the Lens-axes assumption (right-handed, +Y
+  up, cm) holds. If "forward" ever drives the arm sideways, fix `view_yaw_deg`;
+  if up/down or a rotation comes out mirrored, report it rather than tuning
+  around it.
 - **(HW)** With the DG-5F mounted on the flange, the AUBO `tcp_offset` and
-  `payload` in `config/arm_bridge.yaml` must be re-commissioned.
+  `payload` in `station/arm_bridge.yaml` must be re-commissioned.
