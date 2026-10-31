@@ -1,0 +1,22 @@
+{
+  "_comment": "SpecsReach relay tuning (teleop_map.Tuning). Edit and restart the relay -- no Lens rebuild. Keys starting with _ are ignored.",
+  "mode": "view",
+  "_view_yaw_deg": "the arm-base yaw you face from your usual spot: 0 = you look along arm +X, 90 = along +Y, 180 = you face the arm from its +X side",
+  "view_yaw_deg": 0.0,
+  "position_scale": 1.0,
+  "_filter_tau_s": "0.25 (default 0.06): the glasses deliver hand data in bursts (measured 2026-10-30: >100 ms of silence 70% of the time), so a longer low-pass turns the bursts into continuous motion. Lower it if the arm feels sluggish.",
+  "filter_tau_s": 0.25,
+  "deadzone_cm": 1.5,
+  "max_range_mm": 500.0,
+  "max_speed_mm_s": 250.0,
+  "_enable_orientation": "false for the first sessions: position only, so hand-tracking rotation noise cannot turn the tool. Set true to follow wrist rotation.",
+  "enable_orientation": false,
+  "orient_deadzone_deg": 8.0,
+  "max_orient_deg": 120.0,
+  "max_orient_speed_deg_s": 90.0,
+  "_lens_timeout_s": "1.0 (default 0.3): the glasses go silent for up to ~1 s (measured max 974 ms); 0.3 dropped every grab within a second. Matches the bridge's own watchdog_ms 1000 for the Quest. While silent the arm keeps gliding toward the last reported hand position, never past it.",
+  "lens_timeout_s": 1.0,
+  "clutch_release_s": 0.15,
+  "status_fresh_s": 0.15,
+  "calibration_min_cm": 20.0
+}

@@ -1,0 +1,56 @@
+- !<AssetImportMetadata/8c85ecaf-962c-4189-8495-cbbc0cf744d5>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 9fa2fd85-18ae-452c-b921-6ba5283acd00
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 9fa2fd85-18ae-452c-b921-6ba5283acd00
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 674a7523-c0b4-4acb-afb1-582ca7c1581a
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/674a7523-c0b4-4acb-afb1-582ca7c1581a>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: c5d862e5-40bf-4d61-bb90-f0a3eaaab2fe
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    debugLog: false
+    driveHand: false
+    sendRateHz: false
+    serverUrl: false
+    statusText: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - serverUrl: "ws://192.168.1.154:8766"
+      driveHand: right
+      sendRateHz: !<float> 50.000000
+      statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      debugLog: false
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input string serverUrl = "ws://192.168.1.154:8766" {"hint":"Relay address(es), e.g. ws://192.168.1.154:8766. Comma-separate several and the Lens cycles through them on each retry. The relay prints the URL when it starts."}'
+    - "// @input string driveHand = \"right\" {\"hint\":\"The hand whose wrist moves the arm. The other hand's pinch is the clutch.\", \"widget\":\"combobox\", \"values\":[{\"label\":\"right\", \"value\":\"right\"}, {\"label\":\"left\", \"value\":\"left\"}]}"
+    - '// @input float sendRateHz = 50 {"hint":"Send rate in Hz. The bridge streams to the arm at 50."}'
+    - '// @input Component.Text statusText {"hint":"Optional but STRONGLY recommended: a Text component for the on-device status readout. Park it under the Camera so it is always visible."}'
+    - '// @input bool debugLog {"hint":"Also print status to the Logger panel (only visible while tethered to Lens Studio)."}'
