@@ -54,7 +54,7 @@ const COLOR_BAD = new vec4(1.0, 0.35, 0.35, 1.0)
 export class HandBridge extends BaseScriptComponent {
   @input
   @hint("Bridge address(es). Comma-separate several and the Lens cycles through them on each retry -- useful because the network can hand the PC a new IP every so often. Run 'py netcheck.py' on the PC for the current one.")
-  serverUrl: string = "ws://192.168.7.148:8765, ws://192.168.124.7:8765"
+  serverUrl: string = "ws://HAND-PC-IP:8765"
 
   @input
   @widget(new ComboBoxWidget([new ComboBoxItem("right"), new ComboBoxItem("left")]))

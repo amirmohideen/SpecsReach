@@ -16,3 +16,9 @@ Workspaces/**
 *.lock
 
 # Shipped by Lens Studio
+
+# SpecsReach
+ModelImport/
+__pycache__/
+.pytest_cache/
+*.pyc

@@ -16,7 +16,7 @@ import {ClutchControl, ClutchMode, ClutchOut, resolveSwitch} from "./ClutchContr
  * raw keypoints of the DRIVE hand (wrist + three knuckles), whether the CLUTCH
  * hand is pinching, and where the head is looking. Anchoring, the frame
  * mapping, filtering, gating and limits all live in the relay
- * (teleop/teleop-server/tools/specs_relay), so retuning is a JSON edit on the
+ * (specs_relay/ in this repo), so retuning is a JSON edit on the
  * station, not a Lens rebuild.
  *
  * Control: pinch with the clutch hand (default left) to grab the arm; the
@@ -76,8 +76,8 @@ const WARN_LABELS: {[code: number]: string} = {
 @component
 export class ArmTeleop extends BaseScriptComponent {
   @input
-  @hint("Relay address(es), e.g. ws://192.168.1.154:8766. Comma-separate several and the Lens cycles through them on each retry. The relay prints the URL when it starts.")
-  serverUrl: string = "ws://192.168.1.154:8766"
+  @hint("Relay address(es), e.g. ws://192.168.1.50:8766. Comma-separate several and the Lens cycles through them on each retry. The relay prints the URL when it starts.")
+  serverUrl: string = "ws://RELAY-PC-IP:8766"
 
   @input
   @widget(new ComboBoxWidget([new ComboBoxItem("right"), new ComboBoxItem("left")]))
