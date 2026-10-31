@@ -486,8 +486,7 @@ A copy of SpecsGrip's `bridge/` folder: `bridge.py`, its SDK binding, retargetin
 
 <i>SpecsReach is distributed under the <a href="LICENSE">MIT License</a>.</i>
 
-- **The arm bridge** (`arm_bridge/`) comes from the teleop-server project (commit `4cd4187`), trimmed to what drives the AUBO.
-  <!-- TODO before publishing: state the license that covers arm_bridge/. -->
+- **The arm bridge** (`arm_bridge/`) comes from the teleop-server project (commit `4cd4187`), trimmed to what drives the AUBO. It is covered by the same MIT License.
 - **The hand bridge** (`hand_bridge/`) and `HandBridge.ts` come from [SpecsGrip](https://github.com/amirmohideen/SpecsGrip) (MIT, commit `738b92b`).
 - **The AUBO i5H model:** the meshes in `Assets/Auboi5Model/` were converted from the visual meshes in [AuboRobot/aubo_description](https://github.com/AuboRobot/aubo_description) (commit `47fa5e0`), which its `package.xml` lists as BSD-licensed. The URDF in `arm_bridge/` and the kinematics in `AuboKinematics.ts` come from the same source.
 - **AUBO's SDK** (`pyaubo-sdk`) is installed from PyPI when the image is built, and **Tesollo's DGSDK** ships with DGManager. Neither is included here.

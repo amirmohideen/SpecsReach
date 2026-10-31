@@ -42,3 +42,7 @@ and defaults are documented in `arm_bridge/config.py`.
   should not reach; RETREAT (relay key `t`) brings the arm back inside.
 - No heartbeat for `watchdog_ms` holds the arm. Power-on is always an explicit
   command (relay key `e`).
+
+## License
+
+Covered by the repo's [MIT License](../LICENSE).
