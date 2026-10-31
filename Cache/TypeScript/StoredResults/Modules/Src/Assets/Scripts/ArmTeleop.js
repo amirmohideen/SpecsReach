@@ -52,6 +52,10 @@ function component(target) {
 }
 const SIK_1 = require("SpectaclesInteractionKit.lspkg/SIK");
 const WorldCameraFinderProvider_1 = require("SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider");
+const Interactable_1 = require("SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable");
+const Interactor_1 = require("SpectaclesInteractionKit.lspkg/Core/Interactor/Interactor");
+const ArmAxes_1 = require("./ArmAxes");
+const ClutchControl_1 = require("./ClutchControl");
 /**
  * Streams Spectacles hand tracking to the SpecsReach relay, which drives the
  * AUBO arm through the teleop arm bridge.
@@ -66,14 +70,22 @@ const WorldCameraFinderProvider_1 = require("SpectaclesInteractionKit.lspkg/Prov
  * Control: pinch with the clutch hand (default left) to grab the arm; the
  * arm's tool then follows the drive hand's wrist (default right). Release the
  * pinch to let go, re-pinch from a comfortable spot to reach further.
+ * Alternatively, toggle mode: a DRIVE button (pressed with the clutch hand)
+ * starts and stops the grab instead of a held pinch (ClutchControl.ts).
+ *
+ * The arm's X/Y/Z axes are drawn at the drive wrist (ArmAxes.ts), using the
+ * relay's view-mode mapping: dim and following the head before a grab, bright
+ * and frozen while grabbing.
  *
  * Wire format (one JSON text frame per tick, positions in cm, Lens world):
  *   {"type":"hand","t":<ms>,
  *    "drive":{"tracked":true,"wrist":[x,y,z],"index":[..],"middle":[..],"pinky":[..]},
- *    "clutch":{"tracked":true,"pinch":false},
+ *    "clutch":{"tracked":true,"pinch":false,"mode":"pinch"},
  *    "head":{"fwd":[x,y,z]}}
  * plus one {"type":"hello","boot":"<id>","drive":"right","clutch":"left"} on
- * connect. The relay answers ~10 Hz with {"type":"state",...} for the HUD.
+ * connect. In toggle mode clutch.tracked is always true and clutch.pinch is
+ * the DRIVE state. The relay answers ~10 Hz with {"type":"state",...} for the
+ * HUD.
  */
 const COLOR_OK = new vec4(0.2, 0.9, 0.4, 1.0);
 const COLOR_WARN = new vec4(1.0, 0.75, 0.2, 1.0);
@@ -105,6 +117,13 @@ let ArmTeleop = (() => {
             this.sendRateHz = this.sendRateHz;
             this.statusText = this.statusText;
             this.debugLog = this.debugLog;
+            this.clutchMode = this.clutchMode;
+            this.driveButton = this.driveButton;
+            this.driveStateText = this.driveStateText;
+            this.viewYawDeg = this.viewYawDeg;
+            this.axesMaterial = this.axesMaterial;
+            this.axisLabels = this.axisLabels;
+            this.axisLabelSize = this.axisLabelSize;
             this.internetModule = require("LensStudio:InternetModule");
             this.socket = null;
             this.drive = null;
@@ -128,6 +147,17 @@ let ArmTeleop = (() => {
             this.moduleOk = false;
             this.relay = null;
             this.relayAt = 0;
+            // --- clutch (pinch / toggle) and the wrist axes ---
+            this.clutchCtl = new ClutchControl_1.ClutchControl("pinch");
+            this.clutchOut = { tracked: false, pinch: false };
+            this.driveHooked = false;
+            this.axes = null;
+            this.axesNote = "";
+            this.liveFwd = new vec3(0, 0, -1); // horizontal look direction, world
+            this.frozenFwd = null;
+            this.hudNote = "";
+            this.hudNoteAt = 0;
+            this.driveLabel = "";
         }
         __initialize() {
             super.__initialize();
@@ -136,6 +166,13 @@ let ArmTeleop = (() => {
             this.sendRateHz = this.sendRateHz;
             this.statusText = this.statusText;
             this.debugLog = this.debugLog;
+            this.clutchMode = this.clutchMode;
+            this.driveButton = this.driveButton;
+            this.driveStateText = this.driveStateText;
+            this.viewYawDeg = this.viewYawDeg;
+            this.axesMaterial = this.axesMaterial;
+            this.axisLabels = this.axisLabels;
+            this.axisLabelSize = this.axisLabelSize;
             this.internetModule = require("LensStudio:InternetModule");
             this.socket = null;
             this.drive = null;
@@ -159,6 +196,17 @@ let ArmTeleop = (() => {
             this.moduleOk = false;
             this.relay = null;
             this.relayAt = 0;
+            // --- clutch (pinch / toggle) and the wrist axes ---
+            this.clutchCtl = new ClutchControl_1.ClutchControl("pinch");
+            this.clutchOut = { tracked: false, pinch: false };
+            this.driveHooked = false;
+            this.axes = null;
+            this.axesNote = "";
+            this.liveFwd = new vec3(0, 0, -1); // horizontal look direction, world
+            this.frozenFwd = null;
+            this.hudNote = "";
+            this.hudNoteAt = 0;
+            this.driveLabel = "";
         }
         onAwake() {
             // A new id per Lens launch: the world origin restarts with the Lens, so
@@ -169,6 +217,7 @@ let ArmTeleop = (() => {
             this.createEvent("OnDestroyEvent").bind(() => this.closeSocket());
         }
         onStart() {
+            this.clutchCtl = new ClutchControl_1.ClutchControl(this.clutchMode === "toggle" ? "toggle" : "pinch");
             if (this.internetModule === undefined || this.internetModule === null) {
                 this.state = "NO INTERNET MODULE";
                 this.lastError = "require('LensStudio:InternetModule') returned nothing";
@@ -199,9 +248,31 @@ let ArmTeleop = (() => {
                 this.renderHud(true);
                 return;
             }
-            print(`[ArmTeleop] drive=${this.driveHand} -> ${this.urls.join(" | ")}`);
+            this.createAxes();
+            print(`[ArmTeleop] drive=${this.driveHand} clutch=${this.clutchCtl.mode} -> ${this.urls.join(" | ")}`);
             this.renderHud(true);
             this.connect();
+        }
+        createAxes() {
+            if (this.axesMaterial === undefined || this.axesMaterial === null) {
+                this.axesNote = "no Axes Material set";
+                return;
+            }
+            try {
+                const font = this.statusText !== undefined && this.statusText !== null ? this.statusText.font : null;
+                this.axes = new ArmAxes_1.ArmAxes(this.getSceneObject(), this.axesMaterial, {
+                    lengthCm: 6,
+                    thicknessCm: 0.4,
+                    labels: this.axisLabels,
+                    labelSize: this.axisLabelSize,
+                    labelFont: font
+                });
+            }
+            catch (e) {
+                this.axes = null;
+                this.axesNote = `axes failed: ${e}`;
+                print(`[ArmTeleop] ${this.axesNote}`);
+            }
         }
         /** Lens Studio's Preview can reach the relay too, and through Docker every
          * client arrives from the same address -- so say which one this is. */
@@ -244,6 +315,7 @@ let ArmTeleop = (() => {
                     this.retryDelay = 1.0;
                     this.state = "CONNECTED";
                     this.lastError = "-";
+                    this.clutchCtl.connectionChanged("reconnected to the relay");
                     this.send({ type: "hello", boot: this.boot, drive: this.driveHand, clutch: this.clutchName(),
                         device: this.deviceKind() });
                     this.renderHud(true);
@@ -258,6 +330,7 @@ let ArmTeleop = (() => {
                         if (msg.type === "state") {
                             this.relay = msg;
                             this.relayAt = getTime();
+                            this.clutchCtl.relayState(this.relayAt, msg.engaged === true, `${msg.note || ""}`);
                         }
                     }
                     catch (e) {
@@ -268,6 +341,7 @@ let ArmTeleop = (() => {
                     this.connected = false;
                     this.connecting = false;
                     this.relay = null;
+                    this.clutchCtl.connectionChanged("connection to the relay closed");
                     this.lastError = event.code === 1006
                         ? "1006 abnormal: never reached the relay (IP? port? same Wi-Fi?)"
                         : `closed, code ${event.code}`;
@@ -280,6 +354,7 @@ let ArmTeleop = (() => {
                     this.connected = false;
                     this.connecting = false;
                     this.relay = null;
+                    this.clutchCtl.connectionChanged("connection to the relay failed");
                     this.state = "SOCKET ERROR";
                     this.lastError = "onerror -- no route to the relay, or ws:// refused";
                     this.scheduleRetry();
@@ -308,6 +383,7 @@ let ArmTeleop = (() => {
                 this.connected = false;
                 this.state = "SEND FAILED";
                 this.lastError = `${e}`;
+                this.clutchCtl.connectionChanged("sending to the relay failed");
                 this.scheduleRetry();
                 return false;
             }
@@ -338,6 +414,10 @@ let ArmTeleop = (() => {
                 return;
             }
             const now = getTime();
+            this.hookDriveButton();
+            this.updateClutch(now);
+            this.updateDriveLabel();
+            this.updateAxes();
             if (!this.connected) {
                 this.renderHud(false);
                 if (!this.connecting && now >= this.nextRetryAt) {
@@ -356,11 +436,123 @@ let ArmTeleop = (() => {
             }
             this.renderHud(false);
         }
+        /** This frame's clutch (ClutchControl), the head direction, and the axes freeze. */
+        updateClutch(now) {
+            if (this.camera !== null) {
+                // Transform.forward points out of the back of the camera.
+                const look = this.camera.forward().uniformScale(-1);
+                const flat = new vec3(look.x, 0, look.z);
+                if (flat.length > 0.1) { // looking straight up/down: keep the last one
+                    this.liveFwd = flat.normalize();
+                }
+            }
+            const c = this.clutch;
+            const tracked = c !== null && c.isTracked();
+            const wasFrozen = this.clutchCtl.frozen;
+            this.clutchOut = this.clutchCtl.frame(now, tracked, tracked && c.isPinching());
+            if (this.clutchCtl.frozen && !wasFrozen) {
+                this.frozenFwd = this.liveFwd; // the relay freezes its frame at this moment too
+            }
+            else if (!this.clutchCtl.frozen) {
+                this.frozenFwd = null;
+            }
+        }
+        /** ON / OFF in driveStateText. Checked every frame because DRIVE can switch
+         * itself off (ClutchControl.frame); the Text is only written on a change. */
+        updateDriveLabel() {
+            if (this.driveStateText === undefined || this.driveStateText === null) {
+                return;
+            }
+            const label = this.clutchCtl.toggleOn ? "ON" : "OFF";
+            if (label !== this.driveLabel) {
+                this.driveLabel = label;
+                this.driveStateText.text = label;
+            }
+        }
+        /** The arm's axes at the drive wrist, in the relay's view-mode mapping. */
+        updateAxes() {
+            if (this.axes === null) {
+                return;
+            }
+            const d = this.drive;
+            const roomMode = this.relay !== null && this.relay.mode === "room";
+            if (d === null || !d.isTracked() || roomMode) {
+                this.axes.setVisible(false);
+                return;
+            }
+            // f = horizontal look direction (frozen while grabbing), r = f x up (right).
+            // X = f cos(phi) + r sin(phi), Y = f sin(phi) - r cos(phi), Z = up; with
+            // phi = 0: X = where you look, Y = your left, Z = up.
+            const f = this.frozenFwd !== null ? this.frozenFwd : this.liveFwd;
+            const up = vec3.up();
+            const r = f.cross(up);
+            const phi = this.viewYawDeg * Math.PI / 180;
+            const cos = Math.cos(phi);
+            const sin = Math.sin(phi);
+            const x = f.uniformScale(cos).add(r.uniformScale(sin));
+            const y = f.uniformScale(sin).sub(r.uniformScale(cos));
+            const face = this.camera !== null ? this.camera.getTransform().getWorldRotation() : null;
+            this.axes.setVisible(true);
+            this.axes.update(d.wrist.position, [x, y, up], this.frozenFwd !== null, face);
+        }
+        // ---- clutch mode and DRIVE (UIKit hooks) ---------------------------
+        /**
+         * Wire to a UIKit Switch's "On Value Changed Callbacks": on = toggle mode,
+         * off = pinch mode. The Switch calls back repeatedly while its knob
+         * animates, so the mode is set from the value; no argument flips it.
+         */
+        setClutchMode(value) {
+            const toggle = (0, ClutchControl_1.resolveSwitch)(value, this.clutchCtl.mode === "toggle");
+            const mode = toggle ? "toggle" : "pinch";
+            if (this.clutchCtl.setMode(mode)) {
+                print(`[ArmTeleop] clutch mode ${mode}`);
+                this.renderHud(true);
+            }
+        }
+        /**
+         * DRIVE on/off for toggle mode, for wiring a UIKit callback directly: a
+         * number means on = value > 0.5, a boolean is used as is, no argument flips.
+         * Prefer the driveButton input instead, which also rejects presses by the
+         * drive hand -- a callback cannot tell which hand pressed.
+         */
+        setDrive(value) {
+            this.requestDrive((0, ClutchControl_1.resolveSwitch)(value, this.clutchCtl.toggleOn));
+        }
+        requestDrive(on) {
+            const driveTracked = this.drive !== null && this.drive.isTracked();
+            this.clutchCtl.requestDrive(on, getTime(), this.connected, driveTracked);
+            print(`[ArmTeleop] DRIVE ${this.clutchCtl.toggleOn ? "ON" : "OFF"}` +
+                (this.clutchCtl.note ? ` (${this.clutchCtl.note})` : ""));
+            this.renderHud(true);
+        }
+        /** Listen to the DRIVE button's Interactable, which says which hand pressed. */
+        hookDriveButton() {
+            if (this.driveHooked || this.driveButton === undefined || this.driveButton === null) {
+                return;
+            }
+            // UIKit adds the Interactable during its own start: try again next frame.
+            const interactable = this.driveButton.getComponent(Interactable_1.Interactable.getTypeName());
+            if (interactable === null || interactable === undefined) {
+                return;
+            }
+            interactable.onTriggerEnd.add((e) => this.onDrivePressed(e));
+            this.driveHooked = true;
+        }
+        onDrivePressed(e) {
+            const driveBit = this.driveHand === "left" ? Interactor_1.InteractorInputType.LeftHand : Interactor_1.InteractorInputType.RightHand;
+            const by = e !== undefined && e !== null && e.interactor ? e.interactor.inputType : Interactor_1.InteractorInputType.None;
+            if ((by & driveBit) !== 0) {
+                // The drive hand is the one that moves the arm: never let it press DRIVE.
+                this.clutchCtl.note = `DRIVE ignored: press it with your ${this.clutchName()} hand`;
+                print(`[ArmTeleop] ${this.clutchCtl.note}`);
+                this.renderHud(true);
+                return;
+            }
+            this.requestDrive(!this.clutchCtl.toggleOn);
+        }
         sample(now) {
             const d = this.drive;
-            const c = this.clutch;
             const driveTracked = d !== null && d.isTracked();
-            const clutchTracked = c !== null && c.isTracked();
             const drive = { tracked: driveTracked };
             if (driveTracked) {
                 drive.wrist = v3(d.wrist.position);
@@ -372,7 +564,9 @@ let ArmTeleop = (() => {
                 type: "hand",
                 t: Math.round(now * 1000),
                 drive: drive,
-                clutch: { tracked: clutchTracked, pinch: clutchTracked && c.isPinching() }
+                // Pinch mode: the clutch hand's tracking and pinch, as always. Toggle
+                // mode: tracked = true, pinch = DRIVE (ClutchControl).
+                clutch: { tracked: this.clutchOut.tracked, pinch: this.clutchOut.pinch, mode: this.clutchCtl.mode }
             };
             if (this.camera !== null) {
                 // Transform.forward points out of the back of the camera.
@@ -380,7 +574,8 @@ let ArmTeleop = (() => {
             }
             if (this.debugLog && now - this.lastLogAt > 1.0) {
                 this.lastLogAt = now;
-                print(`[ArmTeleop] drive=${driveTracked} clutch=${clutchTracked} pinch=${msg.clutch.pinch}` +
+                print(`[ArmTeleop] drive=${driveTracked} clutch=${this.clutchCtl.mode} ` +
+                    `tracked=${msg.clutch.tracked} pinch=${msg.clutch.pinch}` +
                     (driveTracked ? ` wrist=${drive.wrist.join(",")}` : ""));
             }
             return msg;
@@ -424,8 +619,8 @@ let ArmTeleop = (() => {
                     color = COLOR_OK;
                     if (!driveTracked)
                         note = `show your ${this.driveHand} hand`;
-                    else if (!pinching && !r.note.startsWith("engage refused"))
-                        note = `pinch your ${this.clutchName()} hand to drive`;
+                    else
+                        note = this.clutchHint(pinching, `${r.note || ""}`);
                 }
                 else {
                     color = COLOR_WARN;
@@ -435,13 +630,28 @@ let ArmTeleop = (() => {
                         note = `arm ${r.arm}: enable on the relay (e)`;
                 }
             }
+            // Why DRIVE is off (or was refused): shown while it stays off in toggle
+            // mode, and for a few seconds otherwise.
+            const ctl = this.clutchCtl;
+            if (ctl.note !== this.hudNote) {
+                this.hudNote = ctl.note;
+                this.hudNoteAt = now;
+            }
+            const showNote = ctl.note !== "" &&
+                ((ctl.mode === "toggle" && !ctl.toggleOn) || now - this.hudNoteAt < 5.0);
+            const clutchLine = (ctl.mode === "toggle" ? `toggle  DRIVE ${ctl.toggleOn ? "ON" : "OFF"}` : "pinch") +
+                (showNote ? `  (${ctl.note})` : "");
+            const roomMode = this.relay !== null && this.relay.mode === "room";
+            const axesLine = roomMode ? "room mode: axes unknown" : this.axesNote;
             this.statusText.text =
                 `SPECSREACH ARM ${r !== null && r.engaged ? "  ** DRIVING **" : ""}\n` +
                     `relay : ${this.state}  ${this.currentUrl()}\n` +
                     `bridge: ${r !== null ? r.bridge : "-"}   arm: ${arm}\n` +
                     `mode  : ${r !== null ? r.mode + (r.calibrating ? " (calibrating)" : "") : "-"}   sent: ${this.packetsSent}\n` +
+                    `clutch: ${clutchLine}\n` +
                     `hands : ${this.driveHand} ${driveTracked ? "TRACKED" : "not visible"}, ` +
                     `${this.clutchName()} ${clutchTracked ? (pinching ? "PINCH" : "open") : "not visible"}\n` +
+                    (axesLine ? `axes  : ${axesLine}\n` : "") +
                     `note  : ${note}\n` +
                     `err   : ${this.lastError}`;
             try {
@@ -450,6 +660,24 @@ let ArmTeleop = (() => {
             catch (e) {
                 // some Text configurations do not expose textFill; the text still updates
             }
+        }
+        /** The "what to do next" hint while the arm is ready but not driving. */
+        clutchHint(pinching, relayNote) {
+            const refused = relayNote.startsWith("engage refused");
+            const ctl = this.clutchCtl;
+            if (ctl.mode === "toggle") {
+                if (ctl.toggleOn) {
+                    return refused ? relayNote : "DRIVE on: waiting for the relay to grab";
+                }
+                return `press DRIVE with your ${this.clutchName()} hand`;
+            }
+            if (!ctl.pinchArmed) {
+                return `open your ${this.clutchName()} hand first (clutch mode changed)`;
+            }
+            if (!pinching && !refused) {
+                return `pinch and hold your ${this.clutchName()} hand to drive`;
+            }
+            return relayNote;
         }
     };
     __setFunctionName(_classThis, "ArmTeleop");

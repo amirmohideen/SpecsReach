@@ -1,8 +1,12 @@
 CollapsedEntities:
   type: stringset
   value:
-    size: 747
+    size: 774
     values:
+      - ArmAxesUnlit.mat
+      - Scripts/ArmAxes.ts
+      - Scripts/ArmTeleop.ts
+      - Scripts/ClutchControl.ts
       - SpectaclesInteractionKit.lspkg/Assets
       - SpectaclesInteractionKit.lspkg/Assets/Audio
       - SpectaclesInteractionKit.lspkg/Assets/Audio/HoverAudioTrack.wav
@@ -750,4 +754,27 @@ CollapsedEntities:
       - SpectaclesUIKit.lspkg/Textures/test-image.jpg
       - SpectaclesUIKit.lspkg/package.native
       - SpectaclesUIKit.lspkg/package_dependencies.json
+      - armaxesunlit.ss_graph
+      - aubo_i5H_10
+      - aubo_i5H_10/MANIFEST.json
+      - aubo_i5H_10/aubo_i5H_10.urdf
+      - aubo_i5H_10/meshes
+      - aubo_i5H_10/meshes/aubo_i5H
+      - aubo_i5H_10/meshes/aubo_i5H/collision
+      - aubo_i5H_10/meshes/aubo_i5H/collision/link0.STL
+      - aubo_i5H_10/meshes/aubo_i5H/collision/link1.STL
+      - aubo_i5H_10/meshes/aubo_i5H/collision/link2.STL
+      - aubo_i5H_10/meshes/aubo_i5H/collision/link3.STL
+      - aubo_i5H_10/meshes/aubo_i5H/collision/link4.STL
+      - aubo_i5H_10/meshes/aubo_i5H/collision/link5.STL
+      - aubo_i5H_10/meshes/aubo_i5H/collision/link6.STL
+      - aubo_i5H_10/meshes/aubo_i5H/visual
+      - aubo_i5H_10/meshes/aubo_i5H/visual/link0.DAE
+      - aubo_i5H_10/meshes/aubo_i5H/visual/link1.DAE
+      - aubo_i5H_10/meshes/aubo_i5H/visual/link2.DAE
+      - aubo_i5H_10/meshes/aubo_i5H/visual/link3.DAE
+      - aubo_i5H_10/meshes/aubo_i5H/visual/link4.DAE
+      - aubo_i5H_10/meshes/aubo_i5H/visual/link5.DAE
+      - aubo_i5H_10/meshes/aubo_i5H/visual/link6.DAE
+      - aubo_i5H_10/package.xml
   options: 4
